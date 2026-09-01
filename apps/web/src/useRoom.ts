@@ -28,6 +28,8 @@ export function useRoom(code: string): Room {
   const ws = useRef<WebSocket | null>(null);
   const retry = useRef(0);
   const alive = useRef(true);
+  // 소켓이 열리기 전에 보낸 액션을 담아두었다가 onopen 에서 흘려보낸다.
+  const pending = useRef<Action[]>([]);
 
   useEffect(() => {
     if (!online) return;
@@ -42,6 +44,9 @@ export function useRoom(code: string): Room {
       sock.onopen = () => {
         retry.current = 0;
         setStatus('open');
+        const queued = pending.current;
+        pending.current = [];
+        for (const action of queued) sock.send(JSON.stringify({ t: 'action', action }));
       };
       sock.onmessage = (ev) => {
         const msg = JSON.parse(ev.data as string);
@@ -70,7 +75,8 @@ export function useRoom(code: string): Room {
       if (online) {
         const sock = ws.current;
         if (!sock || sock.readyState !== WebSocket.OPEN) {
-          setError('서버에 연결되어 있지 않습니다');
+          // 접속 중이거나 재접속 대기 중 — 버리지 않고 큐에 넣는다.
+          pending.current.push(action);
           return;
         }
         sock.send(JSON.stringify({ t: 'action', action }));

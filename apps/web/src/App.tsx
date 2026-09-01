@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DIE_COLORS, THEMES, ORIGINAL,
   yellowCandidates, hasFreeYellow, hasFreeBlue, findBlueCell,
@@ -36,9 +36,20 @@ export default function App() {
     return () => removeEventListener('hashchange', h);
   }, []);
 
+  // 참가는 joined 가 true 가 된 다음 렌더에서 보낸다. 클릭 시점의 send 는
+  // 아직 로컬 모드용이라 서버로 가지 않는다. 소켓이 아직 안 열렸으면
+  // useRoom 이 큐에 담아 두었다가 열릴 때 보낸다.
+  const joinSent = useRef(false);
+  useEffect(() => {
+    if (!joined || joinSent.current) return;
+    joinSent.current = true;
+    send({ t: 'join', playerId, name: name.trim() });
+  }, [joined, send, playerId, name]);
+
   const me = state.players.find((p) => p.id === playerId) ?? null;
 
-  if (!joined || !me) {
+  // 참가에 성공해도 아직 시작 전이면 로비에 머문다 — 시작 버튼이 로비에만 있다.
+  if (!joined || !me || state.phase === 'lobby') {
     return (
       <Lobby
         name={name} setName={setName} code={code} setCode={setCode}
@@ -50,7 +61,6 @@ export default function App() {
           if (!name.trim()) return;
           location.hash = '/' + (code || 'LOCAL');
           setJoined(true);
-          setTimeout(() => send({ t: 'join', playerId, name: name.trim() }), 50);
         }}
         onStart={() => send({ t: 'start', playerId })}
         error={error} clearError={clearError}
