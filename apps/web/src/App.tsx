@@ -9,7 +9,7 @@ import { useRoom } from './useRoom.js';
 import { Sheet } from './Sheet.jsx';
 
 const DIE_KO: Record<DieColor, string> = {
-  yellow: '노랑', blue: '파랑', green: '초록', orange: '주황', purple: '보라', white: '흰색',
+  yellow: '노랑', blue: '파랑', green: '초록', orange: '주황', purple: '보라', white: '핑크',
 };
 
 function useLocal(key: string, init: string): [string, (v: string) => void] {
@@ -68,11 +68,20 @@ export default function App() {
     );
   }
 
+  const leaveRoom = () => {
+    send({ t: 'leave', playerId });
+    joinSent.current = false;
+    setJoined(false);
+    setCode('');
+    // hash = '' 는 '#' 가 남고 hashchange 도 안 뜬다. 주소만 조용히 정리한다.
+    history.replaceState(null, '', location.pathname + location.search);
+  };
+
   return (
     <Game
       state={state} me={me} playerId={playerId} theme={theme} themeId={themeId}
       setThemeId={setThemeId} send={send} error={error} clearError={clearError}
-      mode={mode} status={status} code={code}
+      mode={mode} status={status} code={code} onLeave={leaveRoom}
     />
   );
 }
@@ -126,10 +135,13 @@ function Lobby(p: any) {
 
 // ---------------- 게임 ----------------
 
-function Game({ state, me, playerId, theme, themeId, setThemeId, send, error, clearError, mode, status, code }: any) {
+function Game({ state, me, playerId, theme, send, error, clearError, mode, status, code, onLeave }: any) {
   const [sel, setSel] = useState<DieColor | null>(null);
   const [cellMode, setCellMode] = useState<null | { die: DieColor }>(null);
   const [draft, setDraft] = useState<Partial<Dice>>({});
+  const [tab, setTab] = useState<'me' | 'others' | 'score'>('me');
+  const [manual, setManual] = useState(false);
+  const [askLeave, setAskLeave] = useState(false);
 
   const isActive = state.players[state.activeIdx]?.id === playerId;
   const s = state as any;
@@ -187,10 +199,15 @@ function Game({ state, me, playerId, theme, themeId, setThemeId, send, error, cl
             {mode === 'online' ? (status === 'open' ? '온라인' : '연결 중…') : '로컬'}
           </span>
         </div>
-        <select value={themeId} onChange={(e) => setThemeId(e.target.value)}>
-          <option value="earth-system">지구시스템</option>
-          <option value="original">원작</option>
-        </select>
+        {askLeave ? (
+          <span className="leave-ask">
+            정말 나갈까요?
+            <button className="leave" onClick={onLeave}>나가기</button>
+            <button onClick={() => setAskLeave(false)}>취소</button>
+          </span>
+        ) : (
+          <button className="leave" onClick={() => setAskLeave(true)}>방 나가기</button>
+        )}
       </header>
 
       {error && <div className="err" onClick={clearError}>{error} (눌러서 닫기)</div>}
@@ -198,49 +215,216 @@ function Game({ state, me, playerId, theme, themeId, setThemeId, send, error, cl
       {s.phase === 'gameOver' ? (
         <GameOver state={state} theme={theme} />
       ) : (
-        <>
-          <Status state={state} me={me} isActive={isActive} theme={theme} />
+        <div className="layout">
+          {/* ---- 왼쪽 컨트롤바 ---- */}
+          <aside className="sidebar">
+            <nav className="tabs">
+              <button className={tab === 'me' ? 'on' : ''} onClick={() => setTab('me')}>
+                내 {theme.terms.score}판
+              </button>
+              <button
+                className={tab === 'others' ? 'on' : ''}
+                disabled={others.length === 0}
+                onClick={() => setTab('others')}
+              >
+                다른 사람 ({others.length})
+              </button>
+              <button className={tab === 'score' ? 'on' : ''} onClick={() => setTab('score')}>
+                {theme.terms.score}표
+              </button>
+            </nav>
 
-          {/* 선택 대기 (보너스 체인) */}
-          {me.awaiting && <ChoiceBar me={me} send={send} playerId={playerId} theme={theme} />}
+            <Status state={state} me={me} isActive={isActive} theme={theme} />
 
-          {/* 주사위 눈 입력 */}
-          {s.phase === 'enterDice' && isActive && !me.awaiting && (
-            <DiceEntry
-              targets={s.soloPassiveRoll ? [...DIE_COLORS] : s.pool}
-              draft={draft} setDraft={setDraft}
-              onSubmit={() => { send({ t: 'setDice', playerId, dice: draft }); setDraft({}); }}
-              theme={theme}
-            />
-          )}
+            {/* 선택 대기 (보너스 체인) */}
+            {me.awaiting && <ChoiceBar me={me} send={send} playerId={playerId} theme={theme} />}
 
-          {/* 주사위 고르기 */}
-          {!me.awaiting && choosable.length > 0 && (
-            <DicePick
-              dice={s.dice} list={choosable} sel={sel} setSel={setSel}
-              legalAreas={legalAreas} chooseArea={chooseArea}
-              cellMode={cellMode} cancel={() => { setSel(null); setCellMode(null); }}
-              me={me} phase={s.phase} platter={s.platter} placed={s.placed}
-              theme={theme}
-            />
-          )}
+            {/* 주사위 눈 입력 */}
+            {s.phase === 'enterDice' && isActive && !me.awaiting && (
+              <DiceEntry
+                targets={s.soloPassiveRoll ? [...DIE_COLORS] : s.pool}
+                draft={draft} setDraft={setDraft}
+                onSubmit={() => { send({ t: 'setDice', playerId, dice: draft }); setDraft({}); }}
+                theme={theme}
+              />
+            )}
 
-          {/* 액션 버튼 */}
-          <Actions state={state} me={me} isActive={isActive} playerId={playerId} send={send} theme={theme} />
-        </>
-      )}
+            {/* 주사위 고르기 */}
+            {!me.awaiting && choosable.length > 0 && (
+              <DicePick
+                dice={s.dice} list={choosable} sel={sel} setSel={setSel}
+                legalAreas={legalAreas} chooseArea={chooseArea}
+                cellMode={cellMode} cancel={() => { setSel(null); setCellMode(null); }}
+                me={me} phase={s.phase} platter={s.platter} placed={s.placed}
+                theme={theme}
+              />
+            )}
 
-      <Sheet
-        player={me} theme={theme}
-        yellowTargets={yellowTargets} blueTargets={blueTargets}
-        onYellow={onYellow} onBlue={onBlue}
-      />
+            {/* 재굴림 · 추가 주사위 · 턴 종료 */}
+            <Actions state={state} me={me} isActive={isActive} playerId={playerId} send={send} theme={theme} />
 
-      {others.length > 0 && (
-        <div className="others">
-          {others.map((p: Player) => <Sheet key={p.id} player={p} theme={theme} compact />)}
+            <button className="manual-btn" onClick={() => setManual((v) => !v)}>
+              {manual ? '설명서 닫기' : '설명서 열기'}
+            </button>
+            {manual && <Manual theme={theme} onClose={() => setManual(false)} />}
+
+            <Platter state={state} theme={theme} playerId={playerId} />
+          </aside>
+
+          {/* ---- 가운데 보드 ---- */}
+          <main className="board">
+            {tab === 'me' ? (
+              <Sheet
+                player={me} theme={theme} round={s.round} totalRounds={s.totalRounds}
+                yellowTargets={yellowTargets} blueTargets={blueTargets}
+                onYellow={onYellow} onBlue={onBlue}
+              />
+            ) : tab === 'others' ? (
+              <div className="others">
+                {others.map((p: Player) => (
+                  <Sheet key={p.id} player={p} theme={theme} round={s.round} totalRounds={s.totalRounds} />
+                ))}
+              </div>
+            ) : (
+              <ScorePad state={state} theme={theme} playerId={playerId} />
+            )}
+          </main>
         </div>
       )}
+
+    </div>
+  );
+}
+
+/** 컨트롤바에서 켜고 끄는 설명서. 테마 용어를 그대로 쓴다. */
+function Manual({ theme, onClose }: any) {
+  const A = theme.areas;
+  return (
+    <div className="manual">
+      <div className="manual-head">
+        <h3>설명서</h3>
+        <button onClick={onClose}>닫기</button>
+      </div>
+
+      <h4>한 턴의 흐름</h4>
+      <ol>
+        <li>액티브는 {theme.terms.dice} 6개를 굴려 눈을 입력합니다.</li>
+        <li>1개를 골라 {theme.terms.dice} 칸에 올리고 같은 색 영역에 기입합니다.</li>
+        <li>고른 것보다 <b>낮은 눈</b>은 전부 {theme.terms.platter}으로 내려갑니다.</li>
+        <li>남은 것으로 다시 굴려 총 <b>3번</b> 반복합니다.</li>
+        <li>그다음 나머지 사람들이 {theme.terms.platter}에서 <b>각자 1개씩</b> 고릅니다. 같은 것을 여러 명이 골라도 됩니다.</li>
+      </ol>
+
+      <h4>주사위 색</h4>
+      <ul>
+        <li><b className="c-pink">핑크</b>는 조커입니다. {A.yellow.name}·{A.green.name}·{A.orange.name}·{A.purple.name} 아무 데나 쓰거나, 파랑과 합쳐 {A.blue.name}에 씁니다.</li>
+        <li>{A.blue.name}은 <b>파랑 + 핑크의 합</b>으로만 기입합니다. 한쪽 값만으로는 안 됩니다.</li>
+      </ul>
+
+      <h4>영역별 규칙</h4>
+      <ul>
+        <li><b className="c-yellow">{A.yellow.name}</b> 같은 숫자 한 칸을 X. 순서 자유. 세로 완성 = 점수, 가로 완성 = 보너스, 대각선 = {theme.terms.plusOne}.</li>
+        <li><b className="c-blue">{A.blue.name}</b> 합에 해당하는 칸을 X. 순서 자유. 체크한 <b>개수</b>로 점수가 정해집니다.</li>
+        <li><b className="c-green">{A.green.name}</b> 왼쪽부터 순서대로. 칸에 적힌 <b>최소값 이상</b>이어야 합니다. 마지막 칸 위 숫자가 점수.</li>
+        <li><b className="c-orange">{A.orange.name}</b> 왼쪽부터 순서대로 눈을 그대로 적습니다. ×2·×3 칸은 곱해서 적습니다. 합이 점수.</li>
+        <li><b className="c-purple">{A.purple.name}</b> 왼쪽부터 순서대로 <b>직전보다 큰 값</b>. 단 6 다음엔 아무 값이나 가능. 합이 점수.</li>
+      </ul>
+
+      <h4>보너스와 액션</h4>
+      <ul>
+        <li><b>보너스</b>는 저장할 수 없고 <b>즉시</b> 처리합니다. 보너스가 또 보너스를 부르면 연쇄로 이어집니다.</li>
+        <li><b>↻ {theme.terms.reroll}</b> 액티브만 사용. 손에 남은 {theme.terms.dice}를 <b>전부</b> 다시 굴립니다. 굴림 횟수는 줄지 않습니다.</li>
+        <li><b>+1 {theme.terms.plusOne}</b> 턴 마지막에 사용. 6개 중 아무거나 하나를 더 씁니다. 같은 것은 턴당 한 번만.</li>
+        <li>두 액션은 <b>저장했다가 나중에 써도 됩니다.</b></li>
+      </ul>
+
+      <h4>{theme.fox.name}</h4>
+      <p>{theme.fox.law} 다섯 영역 중 <b>가장 낮은 점수</b>만큼만 쳐주므로, 한 영역이라도 0점이면 전부 0점이 됩니다.</p>
+
+      <h4>화면 사용법</h4>
+      <ul>
+        <li>영역 이름이나 보너스 아이콘에 <b>커서를 올리면</b> 해당 규칙 설명이 나옵니다.</li>
+        <li>왼쪽 위 탭으로 내 판 / 다른 사람 판 / {theme.terms.score}표를 넘길 수 있습니다.</li>
+      </ul>
+    </div>
+  );
+}
+
+/** 실시간 점수표 — 실물 시트 뒷면의 집계표에 해당한다. 매 수 자동 갱신. */
+function ScorePad({ state, theme, playerId }: any) {
+  const AREAS: AreaColor[] = ['yellow', 'blue', 'green', 'orange', 'purple'];
+  const rows = state.players
+    .map((p: Player) => ({ p, ...totalScore(p.sheet) }))
+    .sort((a: any, b: any) => b.total - a.total);
+
+  return (
+    <div className="scorepad">
+      <table>
+        <thead>
+          <tr>
+            <th>이름</th>
+            {AREAS.map((a) => (
+              <th key={a} title={theme.areas[a].blurb ?? theme.areas[a].name}>{theme.areas[a].name}</th>
+            ))}
+            <th title={theme.fox.law}>{theme.fox.icon} {theme.fox.name}</th>
+            <th>합계</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r: any, i: number) => (
+            <tr key={r.p.id} className={r.p.id === playerId ? 'me' : ''}>
+              <td>
+                <span className="rank">{i + 1}</span>{r.p.name}
+                {!r.p.connected && ' (끊김)'}
+              </td>
+              {AREAS.map((a) => (
+                <td key={a} className={r.areas[a] === 0 ? 'zero' : ''}>{r.areas[a]}</td>
+              ))}
+              <td title={`${r.p.sheet.foxes}마리 x 최저 영역 ${Math.min(...(Object.values(r.areas) as number[]))}점`}>
+                {r.p.sheet.foxes ? `${r.p.sheet.foxes}x = ${r.fox}` : '0'}
+              </td>
+              <td className="total">{r.total}</td>
+            </tr>
+          ))}
+        </tbody>
+        <caption>
+          매 기입마다 자동으로 다시 계산됩니다.
+          {theme.fox.name} 은(는) 다섯 영역 중 가장 낮은 점수만큼만 쳐주므로,
+          <b> 0점인 영역이 하나라도 있으면 전부 0점</b>이 됩니다 (빨간 숫자).
+        </caption>
+      </table>
+    </div>
+  );
+}
+
+/** 은쟁반과 액티브의 주사위 칸 — 언제나 보이는 현재 상태. */
+function Platter({ state, theme, playerId }: any) {
+  const s = state as any;
+  const active = state.players[state.activeIdx];
+  const chip = (d: DieColor, where: string) => (
+    <span key={where + d} className={'chip-die d-' + d} title={DIE_KO[d]}>
+      <b>{s.dice[d]}</b>{DIE_KO[d]}
+    </span>
+  );
+  return (
+    <div className="platter">
+      <div className="pl-row">
+        <span className="pl-label">{theme.terms.platter}</span>
+        {s.platter.length
+          ? s.platter.map((d: DieColor) => chip(d, 'p'))
+          : <span className="pl-empty">비어 있음</span>}
+      </div>
+      <div className="pl-row">
+        <span className="pl-label">
+          {active?.id === playerId ? '내' : active?.name + ' 의'} {theme.terms.dice} 칸
+        </span>
+        {[0, 1, 2].map((i) => {
+          const d = s.placed[i] as DieColor | undefined;
+          return d
+            ? chip(d, 'f' + i)
+            : <span key={'f' + i} className="chip-die empty">·</span>;
+        })}
+      </div>
     </div>
   );
 }
