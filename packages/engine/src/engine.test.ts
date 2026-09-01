@@ -321,3 +321,21 @@ test('쓸 수 있는 주사위가 있으면 넘기기(skipPlatter)도 거부된�
   s = reduce(s, { t: 'pick', playerId: 'a', die: 'green', as: 'green' });
   assert.throws(() => reduce(s, { t: 'skipPlatter', playerId: 'b' }), RuleError);
 });
+
+test('진행 중인 방에도 새 사람이 들어올 수 있다', () => {
+  let s = started();
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(6) });
+  assert.notEqual(s.phase, 'lobby', '이미 시작된 상태');
+
+  s = reduce(s, { t: 'join', playerId: 'c', name: '다현' });
+  assert.deepEqual(s.players.map((p) => p.name), ['가', '나', '다현']);
+
+  const late = s.players[2];
+  assert.equal(late.pickedThisTurn, true, '이번 턴은 마친 것으로 둔다');
+  assert.equal(late.ready, true, '다른 사람 진행을 막지 않는다');
+});
+
+test('끝난 게임에는 들어올 수 없다', () => {
+  const s = { ...started(), phase: 'gameOver' as const };
+  assert.throws(() => reduce(s, { t: 'join', playerId: 'z', name: '늦은' }), RuleError);
+});

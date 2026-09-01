@@ -519,3 +519,21 @@ button.leave:hover:not(:disabled) { background: #4a2830; }
    보너스가 없는 5·6 은 조금만 좁게 (0.7 배) 해서 비율을 맞춘다. */
 .sidebar .b-round .box { flex: 1 1 0; min-width: 0; }
 .sidebar .b-round .box.plain { flex: 0.7 1 0; }
+
+/* ---- 로비: 방 코드 공유 ---- */
+.sharebox {
+  background: #0e141d; border: 1px solid var(--acc); border-radius: 10px;
+  padding: 12px 14px; margin: 4px 0 14px; text-align: center;
+}
+.sb-label { font-size: 12px; color: var(--dim); }
+.sb-code {
+  font-size: 30px; font-weight: 800; letter-spacing: 3px; color: var(--acc);
+  margin: 2px 0 9px; word-break: break-all;
+}
+.sharebox button { width: 100%; }
+.sb-hint { margin: 9px 0 0; font-size: 12px; color: var(--dim); line-height: 1.5; }
+.lobby .warn {
+  margin: 4px 0 10px; font-size: 13px; color: #ffd98a;
+  background: #3a2f14; border-radius: 8px; padding: 9px 11px; line-height: 1.55;
+}
+.lobby .warn b { color: #ffe9b8; }

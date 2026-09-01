@@ -114,12 +114,24 @@ function Lobby(p: any) {
         <button className="primary" disabled={!p.name.trim()} onClick={p.onJoin}>참가</button>
       ) : (
         <>
+          {p.mode === 'online' && p.code && <ShareBox code={p.code} />}
+
           <ul className="players">
             {p.players.map((x: Player) => <li key={x.id}>{x.name}</li>)}
           </ul>
-          <button className="primary" disabled={p.players.length < 1} onClick={p.onStart}>
-            시작 ({p.players.length}명)
-          </button>
+
+          {p.players.length < 2 && p.mode === 'online' ? (
+            <>
+              <p className="warn">
+                아직 <b>혼자</b>입니다. 다른 사람이 들어오면 아래 인원 수가 늘어납니다.
+              </p>
+              <button className="primary" onClick={p.onStart}>혼자 시작하기</button>
+            </>
+          ) : (
+            <button className="primary" disabled={p.players.length < 1} onClick={p.onStart}>
+              시작 ({p.players.length}명)
+            </button>
+          )}
         </>
       )}
 
@@ -129,6 +141,31 @@ function Lobby(p: any) {
           : '로컬 모드 — 이 브라우저에서만 진행됩니다. 온라인으로 하려면 VITE_SERVER_URL 을 설정하세요.'}
       </p>
       {p.error && <div className="err" onClick={p.clearError}>{p.error}</div>}
+    </div>
+  );
+}
+
+/** 로비에서 방 코드와 링크를 크게 보여준다 — 혼자 먼저 시작해버리는 사고를 줄인다. */
+function ShareBox({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const url = location.origin + location.pathname + '#/' + code;
+  return (
+    <div className="sharebox">
+      <div className="sb-label">방 코드</div>
+      <div className="sb-code">{code}</div>
+      <button
+        onClick={() => {
+          navigator.clipboard?.writeText(url).then(
+            () => { setCopied(true); setTimeout(() => setCopied(false), 2000); },
+            () => {},
+          );
+        }}
+      >
+        {copied ? '복사됨' : '참가 링크 복사'}
+      </button>
+      <p className="sb-hint">
+        다른 사람은 같은 방 코드를 입력하거나 이 링크로 들어오면 됩니다.
+      </p>
     </div>
   );
 }

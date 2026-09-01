@@ -188,10 +188,18 @@ export function reduce(state: GameState, action: Action): GameState {
         find(s, action.playerId).connected = true;
         return s;
       }
-      need(s.phase === 'lobby', '이미 시작된 게임입니다');
+      need(s.phase !== 'gameOver', '이미 끝난 게임입니다');
       need(s.players.length < 4, '최대 4명입니다');
-      s.players.push(newPlayer(action.playerId, action.name));
-      s.log.push(action.name + ' 참가');
+
+      const np = newPlayer(action.playerId, action.name);
+      if (s.phase !== 'lobby') {
+        // 진행 중 합류 — 이번 턴은 이미 지나갔으므로 마친 것으로 두어야
+        // 다른 사람의 진행을 막지 않는다. 다음 턴부터 정상 참여한다.
+        np.pickedThisTurn = true;
+        np.ready = true;
+      }
+      s.players.push(np);
+      s.log.push(action.name + (s.phase === 'lobby' ? ' 참가' : ' 참가 (진행 중 합류)'));
       return s;
     }
 
