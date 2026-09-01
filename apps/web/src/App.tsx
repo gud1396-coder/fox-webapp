@@ -56,6 +56,7 @@ export default function App() {
         themeId={themeId} setThemeId={setThemeId} theme={theme}
         mode={mode}
         players={state.players}
+        playerId={playerId}
         joined={joined}
         onJoin={() => {
           if (!name.trim()) return;
@@ -116,16 +117,29 @@ function Lobby(p: any) {
         <>
           {p.mode === 'online' && p.code && <ShareBox code={p.code} />}
 
+          <div className="players-head">
+            <span>참가자 {p.players.length}명</span>
+            <span className="live"><i />실시간</span>
+          </div>
           <ul className="players">
-            {p.players.map((x: Player) => <li key={x.id}>{x.name}</li>)}
+            {p.players.map((x: Player) => (
+              <li key={x.id}>
+                {x.name}
+                {x.id === p.playerId && <em> (나)</em>}
+              </li>
+            ))}
           </ul>
 
-          {p.players.length < 2 && p.mode === 'online' ? (
+          {p.mode === 'online' && p.players.length < 2 ? (
             <>
-              <p className="warn">
-                아직 <b>혼자</b>입니다. 다른 사람이 들어오면 아래 인원 수가 늘어납니다.
+              <button className="primary" disabled>
+                <span className="dots" aria-hidden="true"><i /><i /><i /></span>
+                다른 사람을 기다리는 중
+              </button>
+              <p className="note sub-note">
+                한 명이라도 더 들어오면 시작 버튼이 켜집니다.
+                {' '}<button className="linkish" onClick={p.onStart}>혼자 연습하기</button>
               </p>
-              <button className="primary" onClick={p.onStart}>혼자 시작하기</button>
             </>
           ) : (
             <button className="primary" disabled={p.players.length < 1} onClick={p.onStart}>

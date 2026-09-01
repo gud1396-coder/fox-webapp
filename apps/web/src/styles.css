@@ -537,3 +537,31 @@ button.leave:hover:not(:disabled) { background: #4a2830; }
   background: #3a2f14; border-radius: 8px; padding: 9px 11px; line-height: 1.55;
 }
 .lobby .warn b { color: #ffe9b8; }
+
+/* ---- 로비: 실시간 참가자 목록 ---- */
+.players-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; color: var(--dim); margin: 4px 2px 6px;
+}
+.players-head .live { display: inline-flex; align-items: center; gap: 5px; color: var(--green); }
+.players-head .live i {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+.players li em { font-style: normal; color: var(--dim); font-size: 12px; }
+
+/* 대기 중 버튼의 점 세 개 */
+.dots { display: inline-flex; gap: 3px; margin-right: 7px; }
+.dots i {
+  width: 5px; height: 5px; border-radius: 50%; background: currentColor;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.dots i:nth-child(2) { animation-delay: .2s; }
+.dots i:nth-child(3) { animation-delay: .4s; }
+
+.sub-note { margin-top: 10px; }
+button.linkish {
+  background: none; border: none; padding: 0; color: var(--acc);
+  text-decoration: underline; cursor: pointer; font-size: 12px;
+}
