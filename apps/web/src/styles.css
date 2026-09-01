@@ -507,8 +507,9 @@ button.leave:hover:not(:disabled) { background: #4a2830; }
 .cell.on { background: #1a2436; }
 .cell.target { border-color: var(--acc); background: #17304f; }
 
-/* 3. 관측 주기: 보너스 없는 칸은 좁게 해서 한 줄에 */
-.sidebar .b-round { flex-wrap: nowrap; gap: 3px; }
+/* 3. 관측 주기: 제목은 한 줄, 칸 6개는 그 아래 한 줄에 */
+.sidebar .b-round { flex-wrap: wrap; gap: 3px; }
+.sidebar .b-round .bar-ico { width: 100%; justify-content: flex-start; min-width: 0; margin-bottom: 3px; }
 .sidebar .b-round .box { min-width: 34px; padding: 3px 2px; }
 .sidebar .b-round .box.plain { min-width: 20px; }
 .sidebar .b-round .box.plain u { display: none; }
