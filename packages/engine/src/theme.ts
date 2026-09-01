@@ -37,7 +37,7 @@ export const ORIGINAL: Theme = {
   title: '영리한 여우',
   subtitle: 'Ganz schön clever',
   areas: {
-    yellow: { name: '노랑', concept: '', blurb: '같은 숫자를 지워 열을 완성하세요.' },
+    yellow: { name: '빨강', concept: '', blurb: '같은 숫자를 지워 열을 완성하세요.' },
     blue: { name: '파랑', concept: '', blurb: '파랑 + 흰색의 합을 지웁니다.' },
     green: { name: '초록', concept: '', blurb: '왼쪽부터, 요구값 이상으로.' },
     orange: { name: '주황', concept: '', blurb: '눈을 그대로 적되 배수 칸을 노리세요.' },

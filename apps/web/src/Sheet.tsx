@@ -58,7 +58,7 @@ function areaTip(a: 'yellow' | 'blue' | 'green' | 'orange' | 'purple', theme: Th
   const W = '핑크(조커)';
   switch (a) {
     case 'yellow':
-      return `${n('yellow')}: 고른 노랑(또는 ${W}) 주사위 눈과 같은 숫자 한 칸을 지웁니다. 순서는 자유입니다.\n`
+      return `${n('yellow')}: 고른 빨강(또는 ${W}) 주사위 눈과 같은 숫자 한 칸을 지웁니다. 순서는 자유입니다.\n`
         + `· 세로 한 줄을 다 지우면 아래 숫자가 그대로 점수가 됩니다.\n`
         + `· 가로 한 줄을 다 지우면 오른쪽 보너스를 얻습니다.\n`
         + `· 대각선(3·1·2·6)을 다 지우면 ${theme.terms.plusOne} 을 얻습니다.`;

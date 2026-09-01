@@ -5,7 +5,8 @@
   --fg: #e8ecf3;
   --dim: #93a0b4;
   --acc: #4c8dff;
-  --yellow: #d8b422;
+  /* 실물 주사위에 노랑이 없어 빨강으로 쓴다. 식별자(yellow)는 엔진과 맞춘다. */
+  --yellow: #e0453c;
   --blue: #2f7fe8;
   --green: #3ba55d;
   --orange: #e07a26;
@@ -428,7 +429,7 @@ button.leave:hover:not(:disabled) { background: #4a2830; }
   border-radius: 5px; font-size: 13px; font-weight: 800; line-height: 1;
   cursor: help; box-shadow: 0 0 0 1px #00000055;
 }
-.bicon.b-yellow { background: var(--yellow); color: #1a1405; }
+.bicon.b-yellow { background: var(--yellow); color: #fff; }
 .bicon.b-blue   { background: var(--blue);   color: #fff; }
 .bicon.b-green  { background: var(--green);  color: #fff; }
 .bicon.b-orange { background: var(--orange); color: #fff; }
@@ -500,9 +501,9 @@ button.leave:hover:not(:disabled) { background: #4a2830; }
 
 /* 2. 지권·수권 칸 테두리를 영역 색으로 밝게 */
 .cell { border: 1.5px solid #46557a; background: #10151d; }
-.a-yellow .cell { border-color: rgba(216, 180, 34, .58); }
+.a-yellow .cell { border-color: rgba(224, 69, 60, .6); }
 .a-blue .cell { border-color: rgba(47, 127, 232, .58); }
-.a-yellow .cell.blank { border-color: rgba(216, 180, 34, .32); background: #0a0d12; }
+.a-yellow .cell.blank { border-color: rgba(224, 69, 60, .34); background: #0a0d12; }
 .a-blue .cell.sumhint { border-color: rgba(232, 99, 155, .5); background: #0a0d12; }
 .cell.on { background: #1a2436; }
 .cell.target { border-color: var(--acc); background: #17304f; }
@@ -588,3 +589,9 @@ button.linkish {
   margin: 10px 0 0; padding: 9px 11px; border-radius: 8px;
   background: #16202e; font-size: 13px; color: var(--fg);
 }
+
+/* ---- 보드를 화면에 맞춤 (스크롤바 없이) ---- */
+.board { overflow: hidden; display: flex; }
+.fit { width: max-content; height: max-content; }
+.board .sheet, .board .others, .board .scorepad { max-width: none; }
+.others { display: grid; gap: 14px; justify-items: start; }

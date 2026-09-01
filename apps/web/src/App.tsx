@@ -9,7 +9,7 @@ import { useRoom } from './useRoom.js';
 import { Sheet, RoundTrack } from './Sheet.jsx';
 
 const DIE_KO: Record<DieColor, string> = {
-  yellow: '노랑', blue: '파랑', green: '초록', orange: '주황', purple: '보라', white: '핑크',
+  yellow: '빨강', blue: '파랑', green: '초록', orange: '주황', purple: '보라', white: '핑크',
 };
 
 function useLocal(key: string, init: string): [string, (v: string) => void] {
@@ -272,6 +272,42 @@ function ShareBox({ code }: { code: string }) {
   );
 }
 
+/**
+ * 보드를 남는 공간에 맞춰 축소한다. 스크롤바 없이 한 화면에 들어오게 하는 게 목적이라
+ * 확대는 하지 않는다(최대 1배). zoom 을 쓰는 이유는 transform 과 달리 레이아웃 크기까지
+ * 줄어들어 빈 공간이 남지 않기 때문이다.
+ */
+function useFitToBox(deps: unknown[]) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    const box = el?.parentElement;
+    if (!el || !box) return;
+
+    const apply = () => {
+      el.style.zoom = '1';
+      const nw = el.scrollWidth;
+      const nh = el.scrollHeight;
+      if (!nw || !nh) return;
+      const cs = getComputedStyle(box);
+      const availW = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const availH = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const scale = Math.min(1, availW / nw, availH / nh);
+      el.style.zoom = String(Math.max(0.4, Math.floor(scale * 100) / 100));
+    };
+
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(box);
+    // 칸이 채워지거나 인원이 늘면 크기가 변하므로 내용 변화도 본다.
+    const mo = new MutationObserver(apply);
+    mo.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => { ro.disconnect(); mo.disconnect(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return ref;
+}
+
 // ---------------- 게임 ----------------
 
 function Game({ state, me, playerId, theme, send, error, clearError, mode, status, code, onLeave }: any) {
@@ -281,6 +317,7 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
   const [tab, setTab] = useState<'me' | 'others' | 'score'>('me');
   const [manual, setManual] = useState(false);
   const [askLeave, setAskLeave] = useState(false);
+  const fitRef = useFitToBox([tab, state]);
 
   const isActive = state.players[state.activeIdx]?.id === playerId;
   const s = state as any;
@@ -420,6 +457,7 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
 
           {/* ---- 가운데 보드 ---- */}
           <main className="board">
+            <div className="fit" ref={fitRef}>
             {tab === 'me' ? (
               <Sheet
                 player={me} theme={theme}
@@ -435,6 +473,7 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
             ) : (
               <ScorePad state={state} theme={theme} playerId={playerId} />
             )}
+            </div>
           </main>
         </div>
       )}
