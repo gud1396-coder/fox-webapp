@@ -31,7 +31,7 @@
 | `VITE_SERVER_URL` | Netlify → Project configuration → Environment variables |
 | `ALLOWED_ORIGINS` | `apps/server/wrangler.toml` 의 `[vars]` |
 | `ADMIN_PASSWORD` | Cloudflare Worker 시크릿 (`wrangler secret`) — **값은 이 문서에 적지 않는다** |
-| `CLOUDFLARE_API_TOKEN` | GitHub 리포 Secrets — **현재 유효하지 않음** (5절) |
+| ~~`CLOUDFLARE_API_TOKEN`~~ | 더 이상 쓰지 않는다. 자동 배포를 걷어냈다 (5절) |
 
 > 저장소가 공개이므로 비밀번호·토큰을 파일에 적지 말 것.
 > 관리자 비밀번호를 잊었으면 `npx wrangler secret put ADMIN_PASSWORD` 로 새로 넣으면 된다.
@@ -63,7 +63,7 @@ apps/server/             Cloudflare Worker + Durable Object → Cloudflare
 
 docs/RULES.md            규칙 정리. 점수판 배치가 표로 정리돼 있다.
 netlify.toml             Netlify 빌드 설정 (건드릴 일 거의 없음).
-.github/workflows/       ci.yml(테스트) / deploy-server.yml(자동 배포, 현재 실패)
+.github/workflows/       ci.yml — 푸시마다 테스트·빌드 검사. (자동 배포는 없앴다)
 ```
 
 **어디를 고쳐야 하나**
@@ -116,8 +116,7 @@ npm test && npm run build:web        # 먼저 검증
 git push origin main                 # → Netlify 자동 재배포
 
 # 엔진이나 서버를 고쳤으면 Worker 도 반드시 따로 배포해야 한다
-npm run build:engine
-npm run deploy -w @fox/server
+npm run deploy:server                # 엔진 빌드 + Worker 배포를 한 번에
 ```
 
 > **엔진(`packages/engine`)을 고치면 Worker 재배포가 필수다.**
@@ -156,15 +155,26 @@ Durable Object 가 방마다 상태를 영구 저장한다. 같은 방 코드로
 
 ## 5. 알려진 문제 / 남은 일
 
-**1. GitHub Actions 자동 배포가 실패한다**
-`deploy-server` 워크플로가 `Authentication failed (status: 400) [code: 9106]` 로 끝난다.
-등록된 `CLOUDFLARE_API_TOKEN` 이 유효하지 않다. 값에 공백이 섞였거나, API 토큰이 아닌
-계정 ID/Global Key 를 넣었을 가능성이 크다.
-→ 토큰을 새로 발급해 시크릿을 덮어쓰면 된다. 확인은
+**1. Worker 자동 배포는 없다 (의도된 상태)**
+`CLOUDFLARE_API_TOKEN` 이 유효하지 않아 `deploy-server` 워크플로가 매번 실패했다.
+토큰을 다시 발급하는 대신 워크플로를 걷어냈다. **Worker 는 CLI 로 배포한다.**
+
+```bash
+npm run deploy:server
+```
+
+`ci.yml`(테스트·빌드 검사)은 그대로 돌아간다.
+
+나중에 자동 배포를 되살리려면 워크플로 파일을 되돌리고 토큰을 넣으면 된다.
+
+```bash
+git show e0cedb7:.github/workflows/deploy-server.yml > .github/workflows/deploy-server.yml
+```
+
+토큰은 https://dash.cloudflare.com/profile/api-tokens 에서 **Edit Cloudflare Workers**
+템플릿으로 발급해 리포 Secrets 의 `CLOUDFLARE_API_TOKEN` 에 넣는다. 발급 후
 `curl -H "Authorization: Bearer <토큰>" https://api.cloudflare.com/client/v4/user/tokens/verify`
-로 `"success": true` 를 보면 된다.
-자동 배포를 안 쓸 거면 `.github/workflows/deploy-server.yml` 을 지워도 된다.
-**현재 Worker 는 CLI 로 배포하고 있어 서비스에는 문제가 없다.**
+로 `"success": true` 인지 먼저 확인할 것. (지난번 실패 원인이 이 값이었다.)
 
 **2. 관리자 패널의 화면 잠금은 클라이언트 검사다**
 `App.tsx` 의 `ADMIN_PW` 상수와 비교하므로 개발자도구로 볼 수 있다.
