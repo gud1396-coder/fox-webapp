@@ -164,8 +164,19 @@ function AdminPanel({ themeId, setThemeId }: { themeId: string; setThemeId: (v: 
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const [locked, setLocked] = useState(false);
+
   const server = (import.meta.env.VITE_SERVER_URL ?? '').trim();
   const httpBase = server.replace(/^ws/, 'http');
+
+  // 패널을 열면 현재 차단 상태를 읽어온다.
+  useEffect(() => {
+    if (!unlocked || !httpBase) return;
+    fetch(httpBase + '/admin/lock')
+      .then((r) => r.json())
+      .then((j) => setLocked(!!j.locked))
+      .catch(() => undefined);
+  }, [unlocked, httpBase]);
 
   const resetRooms = async () => {
     if (!httpBase) { setMsg('로컬 모드에서는 서버 방이 없습니다.'); return; }
@@ -178,6 +189,25 @@ function AdminPanel({ themeId, setThemeId }: { themeId: string; setThemeId: (v: 
       });
       const j = await r.json();
       setMsg(j.ok ? `방 ${j.cleared}개를 초기화했습니다.` : (j.error ?? '실패했습니다.'));
+    } catch {
+      setMsg('서버에 연결하지 못했습니다.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleLock = async () => {
+    if (!httpBase) { setMsg('로컬 모드에서는 서버가 없습니다.'); return; }
+    setBusy(true); setMsg(null);
+    try {
+      const r = await fetch(httpBase + '/admin/lock', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ password: pw, locked: !locked }),
+      });
+      const j = await r.json();
+      if (j.ok) { setLocked(j.locked); setMsg(j.locked ? '서버 연결을 차단했습니다.' : '서버 연결을 다시 허용했습니다.'); }
+      else setMsg(j.error ?? '실패했습니다.');
     } catch {
       setMsg('서버에 연결하지 못했습니다.');
     } finally {
@@ -238,6 +268,15 @@ function AdminPanel({ themeId, setThemeId }: { themeId: string; setThemeId: (v: 
           </button>
           <p className="admin-hint">
             서버에 저장된 <b>모든 방의 진행 상황</b>을 지웁니다. 접속 중인 사람은 연결이 끊깁니다.
+            브라우저에 저장된 내 정보는 지워지지 않습니다 (위 버튼이 그 역할입니다).
+          </p>
+
+          <button className={locked ? 'primary' : 'danger'} disabled={busy} onClick={toggleLock}>
+            {locked ? '서버 연결 허용하기' : '서버 연결 차단하기'}
+          </button>
+          <p className="admin-hint">
+            지금 상태: <b className={locked ? 'lock-on' : 'lock-off'}>{locked ? '차단됨' : '허용됨'}</b>
+            {' '}— 차단하면 새로 들어오려는 사람이 접속하지 못합니다. 수업 시간 외 사용을 막을 때 씁니다.
           </p>
         </>
       )}
@@ -453,6 +492,8 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
 
           {/* ---- 오른쪽 컨트롤바: 주사위 ---- */}
           <aside className="sidebar right">
+            <Platter state={state} theme={theme} playerId={playerId} />
+
             <Status state={state} me={me} isActive={isActive} theme={theme} />
 
             {/* 선택 대기 (보너스 체인) */}
@@ -484,7 +525,6 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
               canPick={[...s.platter, ...s.placed].some(usable)} />
 
 
-            <Platter state={state} theme={theme} playerId={playerId} />
           </aside>
         </div>
       )}
@@ -782,6 +822,9 @@ function Actions({ state, me, isActive, playerId, send, theme, canPick }: any) {
         <button onClick={() => send({ t: 'useReroll', playerId })}>
           ↻ {theme.terms.reroll} ({me.sheet.rerollEarned - me.sheet.rerollUsed})
         </button>
+      )}
+      {isActive && state.phase === 'active' && (
+        <button onClick={() => send({ t: 'redoDice', playerId })}>↺ 눈 다시 입력</button>
       )}
       {isActive && state.phase === 'active' && (
         <button onClick={() => send({ t: 'skipPick', playerId })}>쓸 수 있는 게 없음</button>

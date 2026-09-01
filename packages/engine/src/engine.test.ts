@@ -339,3 +339,41 @@ test('끝난 게임에는 들어올 수 없다', () => {
   const s = { ...started(), phase: 'gameOver' as const };
   assert.throws(() => reduce(s, { t: 'join', playerId: 'z', name: '늦은' }), RuleError);
 });
+
+test('게임이 끝나도 라운드가 총 라운드를 넘지 않는다', () => {
+  const base = started();
+  assert.equal(base.totalRounds, 6, '2인은 6라운드');
+
+  // 마지막 라운드 · 마지막 액티브 · 전원 기입 완료 상태를 만든다.
+  const s: GameState = {
+    ...base,
+    round: base.totalRounds,
+    activeIdx: base.players.length - 1,
+    phase: 'passive',
+    players: base.players.map((p, i) => ({ ...p, pickedThisTurn: true, ready: i === 0 })),
+  };
+
+  const done = reduce(s, { t: 'ready', playerId: 'b' });
+  assert.equal(done.phase, 'gameOver');
+  assert.equal(done.round, done.totalRounds, `종료 시 ${done.round}/${done.totalRounds} 로 표시돼야 한다`);
+});
+
+test('눈 다시 입력은 굴림 횟수를 소모하지 않는다', () => {
+  let s = started();
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(6) });
+  assert.equal(s.phase, 'active');
+  const used = s.rollsUsed;
+
+  s = reduce(s, { t: 'redoDice', playerId: 'a' });
+  assert.equal(s.phase, 'enterDice', '눈 입력 화면으로 돌아간다');
+
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(3) });
+  assert.equal(s.rollsUsed, used, '굴림 횟수는 그대로');
+  assert.equal(s.dice.yellow, 3, '고친 값이 반영된다');
+});
+
+test('액티브가 아니면 눈을 다시 입력할 수 없다', () => {
+  let s = started();
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(6) });
+  assert.throws(() => reduce(s, { t: 'redoDice', playerId: 'b' }), RuleError);
+});

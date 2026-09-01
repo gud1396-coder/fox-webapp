@@ -122,6 +122,8 @@ export type Action =
   | ({ t: 'pick'; playerId: string } & Placement)
   /** 액티브: 이번 굴림에서 쓸 수 있는 주사위가 없음 */
   | { t: 'skipPick'; playerId: string }
+  /** 액티브: 잘못 입력한 눈을 고쳐 넣는다 (굴림 횟수 미소모, 액션도 미소모) */
+  | { t: 'redoDice'; playerId: string }
   /** 액티브: 재굴림 액션 소모 (굴림 횟수 미소모) */
   | { t: 'useReroll'; playerId: string }
   /** 패시브: 은쟁반에서 선택 + 기입 */

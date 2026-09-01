@@ -78,6 +78,35 @@ export default {
       });
     }
 
+    // ---- 관리자: 서버 연결 차단 on/off ----
+    if (url.pathname === '/admin/lock') {
+      const origin = req.headers.get('Origin');
+      const head = cors(origin, env);
+      if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: head });
+      if (!originAllowed(req, env)) return new Response('forbidden origin', { status: 403, headers: head });
+      const index = env.ROOM.get(env.ROOM.idFromName(INDEX_NAME));
+
+      if (req.method === 'GET') {
+        const r = await index.fetch('https://do/__locked');
+        return new Response(await r.text(), {
+          headers: { ...head, 'content-type': 'application/json' },
+        });
+      }
+      if (req.method !== 'POST') return new Response('method not allowed', { status: 405, headers: head });
+
+      let body: { password?: string; locked?: boolean } = {};
+      try { body = (await req.json()) as typeof body; } catch { /* 빈 값 */ }
+      if (!env.ADMIN_PASSWORD || body.password !== env.ADMIN_PASSWORD) {
+        return new Response(JSON.stringify({ ok: false, error: '비밀번호가 맞지 않습니다' }), {
+          status: 403, headers: { ...head, 'content-type': 'application/json' },
+        });
+      }
+      await index.fetch('https://do/__lock?on=' + (body.locked ? '1' : '0'));
+      return new Response(JSON.stringify({ ok: true, locked: !!body.locked }), {
+        headers: { ...head, 'content-type': 'application/json' },
+      });
+    }
+
     // /room/{CODE}
     const m = url.pathname.match(/^\/room\/([A-Za-z0-9-]{1,32})$/);
     if (!m) return new Response('not found', { status: 404 });
@@ -86,6 +115,11 @@ export default {
       return new Response('expected websocket', { status: 426 });
     }
     if (!originAllowed(req, env)) return new Response('forbidden origin', { status: 403 });
+
+    // 관리자가 잠가두면 새 접속을 받지 않는다 (수업 시간 외 사용 제한).
+    const idx = env.ROOM.get(env.ROOM.idFromName(INDEX_NAME));
+    const lock = (await (await idx.fetch('https://do/__locked')).json()) as { locked: boolean };
+    if (lock.locked) return new Response('server locked', { status: 503 });
 
     const code = m[1].toUpperCase();
     // 초기화 대상을 알 수 있도록 열린 방 코드를 색인에 적어둔다.
@@ -128,6 +162,17 @@ export class GameRoom implements DurableObject {
     if (path === '/__clear') {
       await this.ctx.storage.delete('codes');
       return new Response('ok');
+    }
+    if (path === '/__lock') {
+      const on = new URL(req.url).searchParams.get('on') === '1';
+      await this.ctx.storage.put('locked', on);
+      return new Response('ok');
+    }
+    if (path === '/__locked') {
+      const on = (await this.ctx.storage.get<boolean>('locked')) ?? false;
+      return new Response(JSON.stringify({ locked: on }), {
+        headers: { 'content-type': 'application/json' },
+      });
     }
 
     // ---- 방 초기화 ----

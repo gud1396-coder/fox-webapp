@@ -658,3 +658,23 @@ button.linkish {
 /* 좁은 왼쪽 바에서는 관측 주기 칸이 찌그러지지 않고 줄바꿈되게 */
 .sidebar .b-round .box { flex: 1 1 42px; min-width: 42px; }
 .sidebar .b-round .box.plain { flex: 0 1 30px; min-width: 30px; }
+
+/* 3. 관측 주기를 세로 목록으로 */
+.sidebar .b-round { flex-direction: column; align-items: stretch; gap: 4px; }
+.sidebar .b-round .bar-ico { width: auto; margin-bottom: 2px; }
+.sidebar .b-round .box {
+  flex: none; min-width: 0; width: 100%;
+  flex-direction: row; justify-content: flex-start; gap: 8px;
+  padding: 4px 8px;
+}
+.sidebar .b-round .box b { min-width: 14px; text-align: right; }
+.sidebar .b-round .box u { justify-content: flex-start; min-height: 0; }
+.sidebar .b-round .box.plain u { display: flex; }
+.sidebar .b-round .box.plain u .none { font-size: 11px; }
+
+/* 은쟁반이 맨 위로 올라왔으므로 아래 고정 해제 */
+.sidebar .platter { margin-top: 0 !important; }
+
+/* 관리자: 차단 상태 표시 */
+.lock-on { color: #ff9b9b; }
+.lock-off { color: #7ee3a6; }

@@ -167,13 +167,15 @@ function advanceTurn(s: GameState): void {
     return;
   }
   s.activeIdx = 0;
-  s.round++;
-  if (s.round > s.totalRounds) {
+  // 마지막 라운드가 끝나면 round 를 올리지 않는다. 올려버리면 종료 화면에
+  // "7/6" 처럼 존재하지 않는 라운드가 표시된다.
+  if (s.round >= s.totalRounds) {
     s.phase = 'gameOver';
     s.log.push('게임 종료');
-  } else {
-    beginRound(s);
+    return;
   }
+  s.round++;
+  beginRound(s);
 }
 
 // ---------- 리듀서 ----------
@@ -242,6 +244,17 @@ export function reduce(state: GameState, action: Action): GameState {
       if (!s.rerolling) s.rollsUsed++;
       s.rerolling = false;
       s.phase = 'active';
+      return s;
+    }
+
+    case 'redoDice': {
+      // 잘못 입력한 눈을 고친다. 굴림 횟수는 소모하지 않는다.
+      need(s.phase === 'active', '지금은 눈을 다시 입력할 수 없습니다');
+      need(isActive(s, action.playerId), '액티브 플레이어만 다시 입력할 수 있습니다');
+      need(s.placed.length === 0 || s.pool.length > 0, '다시 입력할 주사위가 없습니다');
+      s.rerolling = true;
+      s.phase = 'enterDice';
+      s.log.push(find(s, action.playerId).name + ' 눈 다시 입력');
       return s;
     }
 
