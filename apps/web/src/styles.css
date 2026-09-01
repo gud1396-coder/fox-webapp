@@ -565,3 +565,26 @@ button.linkish {
   background: none; border: none; padding: 0; color: var(--acc);
   text-decoration: underline; cursor: pointer; font-size: 12px;
 }
+
+/* ---- 관리자 모드 ---- */
+.admin-open { text-align: center; margin-top: 26px; }
+.admin {
+  margin-top: 26px; padding: 14px; border-radius: 10px;
+  background: #0e141d; border: 1px solid var(--line);
+}
+.admin-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.admin-head strong { font-size: 14px; }
+.admin form { display: flex; gap: 8px; }
+.admin form input { flex: 1; }
+.admin form .primary { width: auto; padding: 7px 16px; }
+.admin label { display: block; margin-bottom: 14px; color: var(--dim); font-size: 13px; }
+.admin label select { margin-top: 5px; }
+.admin > button { width: 100%; margin-top: 4px; }
+.admin button.danger { background: #5a2530; border-color: #7d3644; color: #ffd7dd; }
+.admin button.danger:hover:not(:disabled) { background: #6d2c39; }
+.admin-hint { margin: 6px 0 14px; font-size: 12px; color: var(--dim); line-height: 1.5; }
+.admin-hint b { color: #ffb4b4; }
+.admin-msg {
+  margin: 10px 0 0; padding: 9px 11px; border-radius: 8px;
+  background: #16202e; font-size: 13px; color: var(--fg);
+}

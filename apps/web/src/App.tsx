@@ -104,13 +104,6 @@ function Lobby(p: any) {
           placeholder={p.mode === 'online' ? '예: SCIENCE1' : '로컬 모드 (한 대로 진행)'} maxLength={16} />
       </label>
 
-      <label>테마
-        <select value={p.themeId} onChange={(e) => p.setThemeId(e.target.value)}>
-          <option value="earth-system">지구시스템 (통합과학)</option>
-          <option value="original">원작 (영리한 여우)</option>
-        </select>
-      </label>
-
       {!p.joined ? (
         <button className="primary" disabled={!p.name.trim()} onClick={p.onJoin}>참가</button>
       ) : (
@@ -155,6 +148,101 @@ function Lobby(p: any) {
           : '로컬 모드 — 이 브라우저에서만 진행됩니다. 온라인으로 하려면 VITE_SERVER_URL 을 설정하세요.'}
       </p>
       {p.error && <div className="err" onClick={p.clearError}>{p.error}</div>}
+
+      <AdminPanel themeId={p.themeId} setThemeId={p.setThemeId} />
+    </div>
+  );
+}
+
+const ADMIN_PW = '6033';
+
+/** 관리자 모드 — 테마 변경, 브라우저 정보 삭제, 모든 방 초기화. */
+function AdminPanel({ themeId, setThemeId }: { themeId: string; setThemeId: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [pw, setPw] = useState('');
+  const [unlocked, setUnlocked] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const server = (import.meta.env.VITE_SERVER_URL ?? '').trim();
+  const httpBase = server.replace(/^ws/, 'http');
+
+  const resetRooms = async () => {
+    if (!httpBase) { setMsg('로컬 모드에서는 서버 방이 없습니다.'); return; }
+    setBusy(true); setMsg(null);
+    try {
+      const r = await fetch(httpBase + '/admin/reset', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      const j = await r.json();
+      setMsg(j.ok ? `방 ${j.cleared}개를 초기화했습니다.` : (j.error ?? '실패했습니다.'));
+    } catch {
+      setMsg('서버에 연결하지 못했습니다.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearLocal = () => {
+    try { localStorage.clear(); } catch { /* 무시 */ }
+    location.href = location.pathname;
+  };
+
+  if (!open) {
+    return (
+      <p className="note admin-open">
+        <button className="linkish" onClick={() => setOpen(true)}>관리자 모드</button>
+      </p>
+    );
+  }
+
+  return (
+    <div className="admin">
+      <div className="admin-head">
+        <strong>관리자 모드</strong>
+        <button className="linkish" onClick={() => { setOpen(false); setUnlocked(false); setPw(''); setMsg(null); }}>
+          닫기
+        </button>
+      </div>
+
+      {!unlocked ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (pw === ADMIN_PW) { setUnlocked(true); setMsg(null); }
+            else setMsg('비밀번호가 맞지 않습니다.');
+          }}
+        >
+          <input
+            type="password" value={pw} onChange={(e) => setPw(e.target.value)}
+            placeholder="비밀번호" autoFocus
+          />
+          <button className="primary" type="submit">확인</button>
+        </form>
+      ) : (
+        <>
+          <label>테마
+            <select value={themeId} onChange={(e) => setThemeId(e.target.value)}>
+              <option value="earth-system">지구시스템 (통합과학)</option>
+              <option value="original">원작 (영리한 여우)</option>
+            </select>
+          </label>
+
+          <button onClick={clearLocal}>이 브라우저 정보 삭제</button>
+          <p className="admin-hint">저장된 이름·플레이어 ID·테마를 지우고 새로 시작합니다.</p>
+
+          <button className="danger" disabled={busy} onClick={resetRooms}>
+            {busy ? '초기화 중…' : '모든 방 초기화'}
+          </button>
+          <p className="admin-hint">
+            서버에 저장된 <b>모든 방의 진행 상황</b>을 지웁니다. 접속 중인 사람은 연결이 끊깁니다.
+          </p>
+        </>
+      )}
+
+      {msg && <p className="admin-msg">{msg}</p>}
     </div>
   );
 }
