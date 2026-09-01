@@ -177,11 +177,12 @@ export function reduce(state: GameState, action: Action): GameState {
 
   switch (action.t) {
     case 'join': {
-      need(s.phase === 'lobby', '이미 시작된 게임입니다');
+      // 이미 참가한 사람의 재접속(새로고침 등)은 진행 중이어도 허용한다.
       if (s.players.some((p) => p.id === action.playerId)) {
         find(s, action.playerId).connected = true;
         return s;
       }
+      need(s.phase === 'lobby', '이미 시작된 게임입니다');
       need(s.players.length < 4, '최대 4명입니다');
       s.players.push(newPlayer(action.playerId, action.name));
       s.log.push(action.name + ' 참가');
