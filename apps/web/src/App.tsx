@@ -320,7 +320,8 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
   const [sel, setSel] = useState<DieColor | null>(null);
   const [cellMode, setCellMode] = useState<null | { die: DieColor }>(null);
   const [draft, setDraft] = useState<Partial<Dice>>({});
-  const [tab, setTab] = useState<'me' | 'others' | 'score'>('me');
+  // 'me' | 'score' | 다른 플레이어의 id
+  const [tab, setTab] = useState<string>('me');
   const [manual, setManual] = useState(false);
   const [askLeave, setAskLeave] = useState(false);
   const fitRef = useFitToBox([tab, state]);
@@ -413,13 +414,12 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
               <button className={tab === 'me' ? 'on' : ''} onClick={() => setTab('me')}>
                 내 {theme.terms.score}판
               </button>
-              <button
-                className={tab === 'others' ? 'on' : ''}
-                disabled={others.length === 0}
-                onClick={() => setTab('others')}
-              >
-                다른 사람 ({others.length})
-              </button>
+              {others.map((p: Player) => (
+                <button key={p.id} className={tab === p.id ? 'on' : ''} onClick={() => setTab(p.id)}>
+                  {p.name}
+                  {!p.connected && <em> ·끊김</em>}
+                </button>
+              ))}
               <button className={tab === 'score' ? 'on' : ''} onClick={() => setTab('score')}>
                 {theme.terms.score}표
               </button>
@@ -427,6 +427,32 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
 
             <RoundTrack round={s.round} totalRounds={s.totalRounds} theme={theme} />
 
+          </aside>
+
+
+
+          {/* ---- 가운데 보드 ---- */}
+          <main className="board">
+            <div className="fit" ref={fitRef}>
+            {tab === 'me' ? (
+              <Sheet
+                player={me} theme={theme}
+                yellowTargets={yellowTargets} blueTargets={blueTargets}
+                onYellow={onYellow} onBlue={onBlue}
+              />
+            ) : tab === 'score' ? (
+              <ScorePad state={state} theme={theme} playerId={playerId} />
+            ) : (
+              <Sheet
+                player={others.find((p: Player) => p.id === tab) ?? me}
+                theme={theme}
+              />
+            )}
+            </div>
+          </main>
+
+          {/* ---- 오른쪽 컨트롤바: 주사위 ---- */}
+          <aside className="sidebar right">
             <Status state={state} me={me} isActive={isActive} theme={theme} />
 
             {/* 선택 대기 (보너스 체인) */}
@@ -460,27 +486,6 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
 
             <Platter state={state} theme={theme} playerId={playerId} />
           </aside>
-
-          {/* ---- 가운데 보드 ---- */}
-          <main className="board">
-            <div className="fit" ref={fitRef}>
-            {tab === 'me' ? (
-              <Sheet
-                player={me} theme={theme}
-                yellowTargets={yellowTargets} blueTargets={blueTargets}
-                onYellow={onYellow} onBlue={onBlue}
-              />
-            ) : tab === 'others' ? (
-              <div className="others">
-                {others.map((p: Player) => (
-                  <Sheet key={p.id} player={p} theme={theme} />
-                ))}
-              </div>
-            ) : (
-              <ScorePad state={state} theme={theme} playerId={playerId} />
-            )}
-            </div>
-          </main>
         </div>
       )}
 

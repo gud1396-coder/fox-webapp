@@ -638,3 +638,23 @@ button.linkish {
 .area-top .area { display: flex; flex-direction: column; }
 .blue-body { flex: 1; }
 .bscale { justify-content: space-between; }
+
+/* ---- 좌: 이동 / 우: 주사위 ---- */
+.layout { grid-template-columns: 190px minmax(0, 1fr) 300px; }
+.sidebar.right { border-right: none; border-left: 1px solid var(--line); }
+
+/* 왼쪽 바는 이동만 담당하므로 탭을 세로로 세운다 */
+.sidebar:not(.right) .tabs { flex-direction: column; gap: 5px; }
+.sidebar:not(.right) .tabs button { width: 100%; text-align: left; }
+.tabs button em { font-style: normal; font-size: 11px; color: #ff8a8a; }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar.right { border-left: none; border-top: 1px solid var(--line); }
+  .sidebar:not(.right) .tabs { flex-direction: row; flex-wrap: wrap; }
+  .sidebar:not(.right) .tabs button { width: auto; }
+}
+
+/* 좁은 왼쪽 바에서는 관측 주기 칸이 찌그러지지 않고 줄바꿈되게 */
+.sidebar .b-round .box { flex: 1 1 42px; min-width: 42px; }
+.sidebar .b-round .box.plain { flex: 0 1 30px; min-width: 30px; }
