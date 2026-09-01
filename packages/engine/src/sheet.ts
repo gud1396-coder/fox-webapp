@@ -3,14 +3,11 @@ import type { Bonus } from './types.js';
 /**
  * 점수 시트 정의 — 전부 데이터다. 렌더링도 규칙도 여기서만 읽는다.
  *
- * [VERIFIED] 는 Schmidt Spiele 공식 독일어 룰북(49340) PDF 의
- * 벡터 텍스트를 좌표와 함께 추출해 확인한 값.
- * [UNVERIFIED] 는 시트의 아이콘이 벡터 도형이라 추출되지 않은 부분.
- * 실물 사진으로 확인 후 이 파일만 고치면 된다 (docs/RULES.md 하단 목록 참고).
+ * 숫자 배치·점수는 Schmidt Spiele 공식 독일어 룰북(49340) PDF 의
+ * 벡터 텍스트에서 추출했고, 아이콘으로 그려져 추출되지 않던 보너스 위치는
+ * 실물 점수판 이미지(BGG pic3941962)를 확대해 확인했다.
+ * 전 항목 [VERIFIED] — 남은 미확인 값 없음 (docs/RULES.md 참고).
  */
-
-/** 아직 실물 확인이 안 된 값임을 표시. grep 용. */
-const TODO = <T>(v: T): T => v;
 
 /** 노랑 4x4. null = 숫자가 없는 특수칸(선체크 상태로 시작). [VERIFIED] */
 export const YELLOW_GRID: readonly (readonly (number | null)[])[] = [
@@ -23,12 +20,12 @@ export const YELLOW_GRID: readonly (readonly (number | null)[])[] = [
 /** 열 완성 시 점수 (좌->우). [VERIFIED] */
 export const YELLOW_COL_SCORE = [10, 14, 16, 20] as const;
 
-/** 행 완성 보너스 (위->아래). 아이콘 종류/대상색 [UNVERIFIED] */
+/** 행 완성 보너스 (위->아래). [VERIFIED] */
 export const YELLOW_ROW_BONUS: readonly (Bonus | null)[] = [
-  TODO<Bonus>({ t: 'x', area: 'blue' }),
-  TODO<Bonus>({ t: 'num', area: 'purple', v: 4 }),
-  TODO<Bonus>({ t: 'x', area: 'green' }),
-  TODO<Bonus>({ t: 'fox' }),
+  { t: 'x', area: 'blue' },
+  { t: 'num', area: 'orange', v: 4 },
+  { t: 'x', area: 'green' },
+  { t: 'fox' },
 ];
 
 /** 좌상->우하 대각선(3,1,2,6) 완성 보너스. [VERIFIED: +1 액션] */
@@ -44,61 +41,65 @@ export const BLUE_GRID: readonly (readonly (number | null)[])[] = [
 /** 체크 개수 -> 점수. index = 개수. [VERIFIED] (룰북 예시 4개=7점, 9개=37점과 일치) */
 export const BLUE_SCALE = [0, 1, 2, 4, 7, 11, 16, 22, 29, 37, 46, 56] as const;
 
-/** 파랑 행 완성 보너스 (위->아래 3행). [UNVERIFIED] */
+/** 파랑 행 완성 보너스 (위->아래 3행). [VERIFIED] */
 export const BLUE_ROW_BONUS: readonly (Bonus | null)[] = [
-  TODO<Bonus>({ t: 'num', area: 'orange', v: 5 }),
-  TODO<Bonus>({ t: 'x', area: 'green' }),
-  TODO<Bonus>({ t: 'fox' }),
+  { t: 'num', area: 'orange', v: 5 },
+  { t: 'x', area: 'yellow' },
+  { t: 'fox' },
 ];
 
-/** 파랑 열 완성 보너스 (좌->우 4열). [UNVERIFIED] */
+/** 파랑 열 완성 보너스 (좌->우 4열). [VERIFIED] */
 export const BLUE_COL_BONUS: readonly (Bonus | null)[] = [
-  TODO<Bonus>({ t: 'fox' }),
-  TODO<Bonus>({ t: 'x', area: 'yellow' }),
-  TODO<Bonus>({ t: 'num', area: 'purple', v: 6 }),
-  TODO<Bonus>({ t: 'plusOne' }),
+  { t: 'reroll' },
+  { t: 'x', area: 'green' },
+  { t: 'num', area: 'purple', v: 6 },
+  { t: 'plusOne' },
 ];
 
-/** 초록: 칸별 최소 요구 눈. [UNVERIFIED - 실물 확인 필요] */
-export const GREEN_MIN: readonly number[] = TODO([1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 6]);
+/** 초록: 칸별 최소 요구 눈. [VERIFIED] */
+export const GREEN_MIN: readonly number[] = [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 6];
 
 /** 초록: n칸 채웠을 때 점수. index = 채운 개수. [VERIFIED] */
 export const GREEN_SCORE = [0, 1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 66] as const;
 
-/** 초록 칸별 보너스 (그 칸을 채우는 즉시). [UNVERIFIED] */
-export const GREEN_BONUS: readonly (Bonus | null)[] = TODO([
-  null, { t: 'plusOne' }, null, { t: 'x', area: 'blue' }, null,
-  { t: 'fox' }, null, { t: 'num', area: 'orange', v: 6 }, null, null, null,
-] as (Bonus | null)[]);
+/** 초록 칸별 보너스 (그 칸을 채우는 즉시). [VERIFIED] */
+export const GREEN_BONUS: readonly (Bonus | null)[] = [
+  null, null, null, { t: 'plusOne' }, null,
+  { t: 'x', area: 'blue' }, { t: 'fox' }, null, { t: 'num', area: 'purple', v: 6 },
+  { t: 'reroll' }, null,
+];
 
-/** 주황: 칸별 배수. [VERIFIED: x2/x2/x2/x3 4개 존재 — 위치는 UNVERIFIED] */
-export const ORANGE_MULT: readonly number[] = TODO([1, 1, 2, 1, 1, 2, 1, 2, 1, 3, 1]);
+/** 주황: 칸별 배수. [VERIFIED] */
+export const ORANGE_MULT: readonly number[] = [1, 1, 1, 2, 1, 1, 2, 1, 2, 1, 3];
 
-/** 주황 칸별 보너스. [UNVERIFIED] */
-export const ORANGE_BONUS: readonly (Bonus | null)[] = TODO([
-  null, null, null, { t: 'x', area: 'yellow' }, { t: 'plusOne' },
-  null, { t: 'fox' }, null, { t: 'num', area: 'purple', v: 6 }, null, null,
-] as (Bonus | null)[]);
+/** 주황 칸별 보너스. [VERIFIED] */
+export const ORANGE_BONUS: readonly (Bonus | null)[] = [
+  null, null, { t: 'reroll' }, null, { t: 'x', area: 'yellow' },
+  { t: 'plusOne' }, null, { t: 'fox' }, null, { t: 'num', area: 'purple', v: 6 },
+  null,
+];
 
-/** 보라 칸별 보너스. [UNVERIFIED] */
-export const PURPLE_BONUS: readonly (Bonus | null)[] = TODO([
-  null, { t: 'x', area: 'blue' }, { t: 'plusOne' }, { t: 'x', area: 'green' }, null,
-  { t: 'fox' }, { t: 'x', area: 'yellow' }, null, { t: 'num', area: 'orange', v: 6 },
-  { t: 'plusOne' }, null,
-] as (Bonus | null)[]);
+/** 보라 칸별 보너스. [VERIFIED] */
+export const PURPLE_BONUS: readonly (Bonus | null)[] = [
+  null, null, { t: 'reroll' }, { t: 'x', area: 'blue' }, { t: 'plusOne' },
+  { t: 'x', area: 'yellow' }, { t: 'fox' }, { t: 'reroll' }, { t: 'x', area: 'green' },
+  { t: 'num', area: 'orange', v: 6 }, { t: 'plusOne' },
+];
 
 export const GREEN_SLOTS = GREEN_MIN.length;
 export const ORANGE_SLOTS = ORANGE_MULT.length;
 export const PURPLE_SLOTS = PURPLE_BONUS.length;
 
 /**
- * 라운드 시작 보너스. index = 라운드-1. null = 없음.
- * 2택인 라운드는 배열 2개. [라운드4 2택 VERIFIED, 1/3라운드 아이콘 UNVERIFIED]
+ * 라운드 시작 보너스. index = 라운드-1. null = 없음. [VERIFIED]
+ * 2택인 라운드는 배열 2개.
+ * 5/6라운드 칸의 점 아이콘은 보너스가 아니라 그 라운드를 진행하는 인원
+ * 표시다 (5R = 1·2·3인, 6R = 1·2인) — totalRounds() 와 같은 내용.
  */
 export const ROUND_BONUS: readonly (Bonus | [Bonus, Bonus] | null)[] = [
-  TODO<Bonus>({ t: 'reroll' }),
+  { t: 'reroll' },
   { t: 'plusOne' },
-  TODO<Bonus>({ t: 'reroll' }),
+  { t: 'reroll' },
   [{ t: 'xAny' }, { t: 'numAny', v: 6 }],
   null,
   null,

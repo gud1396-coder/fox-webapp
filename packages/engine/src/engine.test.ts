@@ -3,7 +3,11 @@ import { test } from 'node:test';
 import { createGame, reduce } from './reducer.js';
 import { areaScores, totalScore } from './score.js';
 import { createSheet, drain, findBlueCell, markYellow, writePurple } from './sheetOps.js';
-import { BLUE_SCALE, GREEN_SCORE, YELLOW_COL_SCORE, totalRounds } from './sheet.js';
+import {
+  BLUE_SCALE, GREEN_SCORE, YELLOW_COL_SCORE, totalRounds,
+  GREEN_MIN, GREEN_BONUS, ORANGE_MULT, ORANGE_BONUS, PURPLE_BONUS,
+  YELLOW_ROW_BONUS, BLUE_ROW_BONUS, BLUE_COL_BONUS, ROUND_BONUS,
+} from './sheet.js';
 import type { Action, Dice, GameState, Player } from './types.js';
 import { RuleError } from './types.js';
 
@@ -217,4 +221,50 @@ test('패시브 전원이 마쳐야 다음 턴으로 간다', () => {
   s = reduce(s, { t: 'ready', playerId: 'b' });
   assert.equal(s.activeIdx, 1, '다음 액티브로 넘어감');
   assert.equal(s.phase, 'enterDice');
+});
+
+// ---- 실물 점수판(BGG pic3941962)에서 확인한 배치를 고정한다 ----
+
+test('초록: 최소 요구값과 보너스 위치', () => {
+  assert.deepEqual([...GREEN_MIN], [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 6]);
+  const at = (i: number) => JSON.stringify(GREEN_BONUS[i]);
+  assert.equal(at(3), JSON.stringify({ t: 'plusOne' }));
+  assert.equal(at(5), JSON.stringify({ t: 'x', area: 'blue' }));
+  assert.equal(at(6), JSON.stringify({ t: 'fox' }));
+  assert.equal(at(8), JSON.stringify({ t: 'num', area: 'purple', v: 6 }));
+  assert.equal(at(9), JSON.stringify({ t: 'reroll' }));
+  assert.equal(GREEN_BONUS.filter(Boolean).length, 5);
+});
+
+test('주황: 배수는 4·7·9번 x2, 11번 x3', () => {
+  assert.deepEqual([...ORANGE_MULT], [1, 1, 1, 2, 1, 1, 2, 1, 2, 1, 3]);
+  assert.equal(ORANGE_MULT.filter((m) => m === 2).length, 3);
+  assert.equal(ORANGE_MULT.filter((m) => m === 3).length, 1);
+  assert.equal(ORANGE_BONUS.filter(Boolean).length, 5);
+});
+
+test('보라: 11칸 중 9칸에 보너스가 있다', () => {
+  assert.equal(PURPLE_BONUS.length, 11);
+  assert.equal(PURPLE_BONUS.filter(Boolean).length, 9);
+  assert.equal(PURPLE_BONUS[0], null);
+  assert.equal(PURPLE_BONUS[1], null);
+  assert.equal(JSON.stringify(PURPLE_BONUS[10]), JSON.stringify({ t: 'plusOne' }));
+});
+
+test('여우는 시트 전체에 5마리', () => {
+  const isFox = (b: unknown) => JSON.stringify(b) === JSON.stringify({ t: 'fox' });
+  const count = [
+    ...YELLOW_ROW_BONUS, ...BLUE_ROW_BONUS, ...BLUE_COL_BONUS,
+    ...GREEN_BONUS, ...ORANGE_BONUS, ...PURPLE_BONUS,
+  ].filter(isFox).length;
+  assert.equal(count, 5);
+});
+
+test('라운드 트래커: 1·3 재굴림, 2 +1, 4 는 2택, 5·6 없음', () => {
+  assert.equal(JSON.stringify(ROUND_BONUS[0]), JSON.stringify({ t: 'reroll' }));
+  assert.equal(JSON.stringify(ROUND_BONUS[1]), JSON.stringify({ t: 'plusOne' }));
+  assert.equal(JSON.stringify(ROUND_BONUS[2]), JSON.stringify({ t: 'reroll' }));
+  assert.ok(Array.isArray(ROUND_BONUS[3]));
+  assert.equal(ROUND_BONUS[4], null);
+  assert.equal(ROUND_BONUS[5], null);
 });
