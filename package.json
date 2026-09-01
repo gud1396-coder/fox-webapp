@@ -1,0 +1,13 @@
+{
+  "name": "fox-webapp",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "build:engine": "npm run build -w @fox/engine",
+    "build:web": "npm run build:engine && npm run build -w @fox/web",
+    "test": "npm run test -w @fox/engine",
+    "dev:web": "npm run dev -w @fox/web",
+    "dev:server": "npm run dev -w @fox/server"
+  }
+}
