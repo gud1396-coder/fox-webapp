@@ -5,10 +5,13 @@
 
 통합과학 수업용 **지구시스템 테마**를 내장하고 있습니다 (원작 테마와 토글).
 
+> **다시 작업을 시작한다면 [`log.md`](log.md) 를 먼저 읽으세요.**
+> 배포 주소·설정값 위치·파일 지도·재개 절차·남은 문제가 정리돼 있습니다.
+
 ## 구조
 
 ```
-packages/engine/   순수 TypeScript 규칙 엔진 (의존성 0, 테스트 19개)
+packages/engine/   순수 TypeScript 규칙 엔진 (의존성 0, 테스트 32개)
 apps/web/          React + Vite 클라이언트  → Netlify
 apps/server/       Cloudflare Worker + Durable Object → Cloudflare
 ```
