@@ -272,8 +272,12 @@ function ShareBox({ code }: { code: string }) {
   );
 }
 
+/** 화면 맞춤 배율 범위. 너무 키우면 촌스럽고, 너무 줄이면 숫자가 안 읽힌다. */
+const MIN_FIT = 0.4;
+const MAX_FIT = 1.8;
+
 /**
- * 보드를 남는 공간에 맞춰 축소한다. 스크롤바 없이 한 화면에 들어오게 하는 게 목적이라
+ * 보드를 남는 공간에 맞춰 키우거나 줄인다. 스크롤바 없이 한 화면에 들어오게 하는 게 목적이라
  * 확대는 하지 않는다(최대 1배). zoom 을 쓰는 이유는 transform 과 달리 레이아웃 크기까지
  * 줄어들어 빈 공간이 남지 않기 때문이다.
  */
@@ -292,8 +296,10 @@ function useFitToBox(deps: unknown[]) {
       const cs = getComputedStyle(box);
       const availW = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
       const availH = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-      const scale = Math.min(1, availW / nw, availH / nh);
-      el.style.zoom = String(Math.max(0.4, Math.floor(scale * 100) / 100));
+      // 남는 공간이 있으면 키워서 채우고, 넘치면 줄인다.
+      const scale = Math.min(availW / nw, availH / nh);
+      const clamped = Math.min(MAX_FIT, Math.max(MIN_FIT, scale));
+      el.style.zoom = String(Math.floor(clamped * 100) / 100);
     };
 
     apply();

@@ -155,6 +155,7 @@ export function Sheet({
       </div>
 
       <div className="areas">
+        <div className="area-top">
         {/* 노랑 */}
         <section className="area a-yellow">
           <h4 title={areaTip('yellow', theme)}>{theme.areas.yellow.name} <em>{areas.yellow}</em></h4>
@@ -225,6 +226,7 @@ export function Sheet({
             </div>
           </div>
         </section>
+        </div>
 
         {/* 초록 */}
         <section className="area a-green">
