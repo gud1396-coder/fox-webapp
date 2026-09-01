@@ -13,4 +13,4 @@ new_sqlite_classes = ["GameRoom"]
 
 [vars]
 # 배포 후 Netlify 도메인으로 바꾸세요. 비워두면 모든 오리진을 허용합니다.
-ALLOWED_ORIGINS = ""
+ALLOWED_ORIGINS = "https://marvelous-rabanadas-6be02f.netlify.app"
