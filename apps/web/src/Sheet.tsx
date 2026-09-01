@@ -82,6 +82,38 @@ function areaTip(a: 'yellow' | 'blue' | 'green' | 'orange' | 'purple', theme: Th
   }
 }
 
+/** 관측 주기(라운드) 트랙 — 컨트롤바에 놓는다. */
+export function RoundTrack({ round, totalRounds, theme }: {
+  round: number; totalRounds: number; theme: Theme;
+}) {
+  return (
+    <div className="bar b-round">
+      <span className="bar-ico">{theme.terms.round}</span>
+      {Array.from({ length: 6 }, (_, i) => {
+        const rb = ROUND_BONUS[i];
+        const pair = Array.isArray(rb);
+        const icons = pair
+          ? <><BonusIcon b={rb[0]} theme={theme} /><BonusIcon b={rb[1]} theme={theme} /></>
+          : rb ? <BonusIcon b={rb as Bonus} theme={theme} /> : <span className="none">—</span>;
+        const head = `${i + 1}${theme.terms.round} 시작`;
+        const tip = pair
+          ? `${head}: 둘 중 하나를 고릅니다.
+· ${bonusTip(rb[0], theme)}
+· ${bonusTip(rb[1], theme)}`
+          : rb ? `${head}: ${bonusTip(rb as Bonus, theme)}`
+          : `${i + 1}${theme.terms.round} 은 시작 보너스가 없습니다.`;
+        return (
+          <i key={i} title={tip}
+            className={'box' + (rb ? '' : ' plain') + (i + 1 < round ? ' done' : '') + (i + 1 === round ? ' now' : '') + (i + 1 > totalRounds ? ' off' : '')}>
+            <b>{i + 1}</b>
+            <u>{icons}</u>
+          </i>
+        );
+      })}
+    </div>
+  );
+}
+
 /** 실물 시트의 액션 바 칸 수 (재굴림·추가 주사위 각 7칸). */
 const ACTION_SLOTS = 7;
 
@@ -89,9 +121,6 @@ interface Props {
   player: Player;
   theme: Theme;
   compact?: boolean;
-  /** 라운드 트랙 표시용. 없으면 트랙을 그리지 않는다. */
-  round?: number;
-  totalRounds?: number;
   /** 클릭 가능한 노랑 칸 목록 (없으면 비활성) */
   yellowTargets?: { r: number; c: number }[];
   blueTargets?: { r: number; c: number }[];
@@ -102,7 +131,7 @@ interface Props {
 const key = (r: number, c: number) => r + ':' + c;
 
 export function Sheet({
-  player, theme, compact, round, totalRounds, yellowTargets, blueTargets, onYellow, onBlue,
+  player, theme, compact, yellowTargets, blueTargets, onYellow, onBlue,
 }: Props) {
   const s = player.sheet;
   const areas = areaScores(s);
@@ -117,43 +146,12 @@ export function Sheet({
         <strong>{player.name}</strong>
         <span className="total">{total.total}점</span>
         {!player.connected && <span className="off">연결 끊김</span>}
-      </div>
-
-      {/* 실물 시트 상단: 라운드 트랙 + 액션 바 2줄 */}
-      <div className="sheet-bars">
-        {round !== undefined && totalRounds !== undefined && (
-          <div className="bar b-round">
-            <span className="bar-ico">{theme.terms.round}</span>
-            {Array.from({ length: 6 }, (_, i) => {
-              const rb = ROUND_BONUS[i];
-              const pair = Array.isArray(rb);
-              const icons = pair
-                ? <><BonusIcon b={rb[0]} theme={theme} /><BonusIcon b={rb[1]} theme={theme} /></>
-                : rb ? <BonusIcon b={rb as Bonus} theme={theme} /> : <span className="none">—</span>;
-              const head = `${i + 1}${theme.terms.round} 시작`;
-              const tip = pair
-                ? `${head}: 둘 중 하나를 고릅니다.\n· ${bonusTip(rb[0], theme)}\n· ${bonusTip(rb[1], theme)}`
-                : rb
-                  ? `${head}: ${bonusTip(rb as Bonus, theme)}`
-                  : `${i + 1}${theme.terms.round} 은 시작 보너스가 없습니다.`;
-              return (
-                <i key={i} title={tip}
-                  className={'box' + (i + 1 < round ? ' done' : '') + (i + 1 === round ? ' now' : '') + (i + 1 > totalRounds ? ' off' : '')}>
-                  <b>{i + 1}</b>
-                  <u>{icons}</u>
-                </i>
-              );
-            })}
-          </div>
-        )}
-        <ActionBar
-          cls="b-reroll" ico="↻" label={theme.terms.reroll}
-          earned={s.rerollEarned} used={s.rerollUsed}
-        />
-        <ActionBar
-          cls="b-plus" ico="+1" label={theme.terms.plusOne}
-          earned={s.plusOneEarned} used={s.plusOneUsed}
-        />
+        <div className="head-actions">
+          <ActionBar cls="b-reroll" ico="↻" label={theme.terms.reroll}
+            earned={s.rerollEarned} used={s.rerollUsed} />
+          <ActionBar cls="b-plus" ico="+1" label={theme.terms.plusOne}
+            earned={s.plusOneEarned} used={s.plusOneUsed} />
+        </div>
       </div>
 
       <div className="areas">
@@ -187,7 +185,6 @@ export function Sheet({
               <span className="rowbonus"><BonusIcon b={YELLOW_DIAG_BONUS} theme={theme} /></span>
             </div>
           </div>
-          <p className="area-note dim">세로 줄을 다 채우면 <b>아래 숫자가 점수</b>, 가로 줄은 <b>오른쪽</b> 보너스, 대각선은 맨 오른쪽 아래 보너스입니다.</p>
         </section>
 
         {/* 파랑 */}
@@ -227,13 +224,13 @@ export function Sheet({
               <span className="rowbonus" />
             </div>
           </div>
-          <p className="area-note dim">세로 줄을 다 채우면 <b>아래</b> 보너스, 가로 줄을 다 채우면 <b>오른쪽</b> 보너스를 즉시 받습니다.</p>
         </section>
 
         {/* 초록 */}
         <section className="area a-green">
           <h4 title={areaTip('green', theme)}>{theme.areas.green.name} <em>{areas.green}</em></h4>
           <div className="track">
+            <span className="track-arrow" aria-hidden="true">➜</span>
             {GREEN_MIN.map((min, i) => (
               <div key={i} className={'slot' + (i < s.green ? ' on' : '') + (i === s.green ? ' next' : '')}>
                 <span className="sc">{GREEN_SCORE[i + 1]}</span>
@@ -248,6 +245,7 @@ export function Sheet({
         <section className="area a-orange">
           <h4 title={areaTip('orange', theme)}>{theme.areas.orange.name} <em>{areas.orange}</em></h4>
           <div className="track">
+            <span className="track-arrow" aria-hidden="true">➜</span>
             {ORANGE_MULT.map((m, i) => (
               <div key={i} className={'slot' + (s.orange[i] !== null ? ' on' : '')}>
                 <span className="sc">{m > 1 ? '×' + m : ''}</span>
@@ -262,6 +260,7 @@ export function Sheet({
         <section className="area a-purple">
           <h4 title={areaTip('purple', theme)}>{theme.areas.purple.name} <em>{areas.purple}</em></h4>
           <div className="track">
+            <span className="track-arrow" aria-hidden="true">➜</span>
             {PURPLE_BONUS.map((b, i) => (
               <div key={i} className={'slot' + (s.purple[i] !== null ? ' on' : '')}>
                 <span className="sc" />

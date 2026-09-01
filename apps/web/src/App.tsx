@@ -6,7 +6,7 @@ import {
 } from '@fox/engine';
 import type { AreaColor, DieColor, Dice, Player } from '@fox/engine';
 import { useRoom } from './useRoom.js';
-import { Sheet } from './Sheet.jsx';
+import { Sheet, RoundTrack } from './Sheet.jsx';
 
 const DIE_KO: Record<DieColor, string> = {
   yellow: '노랑', blue: '파랑', green: '초록', orange: '주황', purple: '보라', white: '핑크',
@@ -199,15 +199,18 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
             {mode === 'online' ? (status === 'open' ? '온라인' : '연결 중…') : '로컬'}
           </span>
         </div>
-        {askLeave ? (
-          <span className="leave-ask">
-            정말 나갈까요?
-            <button className="leave" onClick={onLeave}>나가기</button>
-            <button onClick={() => setAskLeave(false)}>취소</button>
-          </span>
-        ) : (
-          <button className="leave" onClick={() => setAskLeave(true)}>방 나가기</button>
-        )}
+        <div className="head-right">
+          <button className="manual-btn" onClick={() => setManual(true)}>설명서</button>
+          {askLeave ? (
+            <span className="leave-ask">
+              정말 나갈까요?
+              <button className="leave" onClick={onLeave}>나가기</button>
+              <button onClick={() => setAskLeave(false)}>취소</button>
+            </span>
+          ) : (
+            <button className="leave" onClick={() => setAskLeave(true)}>방 나가기</button>
+          )}
+        </div>
       </header>
 
       {error && <div className="err" onClick={clearError}>{error} (눌러서 닫기)</div>}
@@ -233,6 +236,8 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
                 {theme.terms.score}표
               </button>
             </nav>
+
+            <RoundTrack round={s.round} totalRounds={s.totalRounds} theme={theme} />
 
             <Status state={state} me={me} isActive={isActive} theme={theme} />
 
@@ -263,7 +268,6 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
             {/* 재굴림 · 추가 주사위 · 턴 종료 */}
             <Actions state={state} me={me} isActive={isActive} playerId={playerId} send={send} theme={theme} />
 
-            <button className="manual-btn" onClick={() => setManual(true)}>설명서 열기</button>
 
             <Platter state={state} theme={theme} playerId={playerId} />
           </aside>
@@ -272,14 +276,14 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
           <main className="board">
             {tab === 'me' ? (
               <Sheet
-                player={me} theme={theme} round={s.round} totalRounds={s.totalRounds}
+                player={me} theme={theme}
                 yellowTargets={yellowTargets} blueTargets={blueTargets}
                 onYellow={onYellow} onBlue={onBlue}
               />
             ) : tab === 'others' ? (
               <div className="others">
                 {others.map((p: Player) => (
-                  <Sheet key={p.id} player={p} theme={theme} round={s.round} totalRounds={s.totalRounds} />
+                  <Sheet key={p.id} player={p} theme={theme} />
                 ))}
               </div>
             ) : (
