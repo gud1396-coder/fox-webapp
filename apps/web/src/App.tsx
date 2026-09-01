@@ -263,10 +263,7 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
             {/* 재굴림 · 추가 주사위 · 턴 종료 */}
             <Actions state={state} me={me} isActive={isActive} playerId={playerId} send={send} theme={theme} />
 
-            <button className="manual-btn" onClick={() => setManual((v) => !v)}>
-              {manual ? '설명서 닫기' : '설명서 열기'}
-            </button>
-            {manual && <Manual theme={theme} onClose={() => setManual(false)} />}
+            <button className="manual-btn" onClick={() => setManual(true)}>설명서 열기</button>
 
             <Platter state={state} theme={theme} playerId={playerId} />
           </aside>
@@ -292,6 +289,7 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
         </div>
       )}
 
+      {manual && <Manual theme={theme} onClose={() => setManual(false)} />}
     </div>
   );
 }
@@ -299,8 +297,16 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
 /** 컨트롤바에서 켜고 끄는 설명서. 테마 용어를 그대로 쓴다. */
 function Manual({ theme, onClose }: any) {
   const A = theme.areas;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   return (
-    <div className="manual">
+    <div className="manual-overlay" onClick={onClose}>
+      <div className="manual" role="dialog" aria-modal onClick={(e) => e.stopPropagation()}>
       <div className="manual-head">
         <h3>설명서</h3>
         <button onClick={onClose}>닫기</button>
@@ -345,7 +351,9 @@ function Manual({ theme, onClose }: any) {
       <ul>
         <li>영역 이름이나 보너스 아이콘에 <b>커서를 올리면</b> 해당 규칙 설명이 나옵니다.</li>
         <li>왼쪽 위 탭으로 내 판 / 다른 사람 판 / {theme.terms.score}표를 넘길 수 있습니다.</li>
+        <li><b>Esc</b> 를 누르거나 바깥을 클릭하면 이 설명서가 닫힙니다.</li>
       </ul>
+      </div>
     </div>
   );
 }

@@ -7,16 +7,24 @@ import {
 } from '@fox/engine';
 import type { Bonus, Player, Theme } from '@fox/engine';
 
-export function bonusLabel(b: Bonus | null | undefined): string {
-  if (!b) return '';
+/**
+ * 보너스를 실물처럼 색 배지로 그린다.
+ * 파랑 X = 파란 칩의 X, 주황 4 = 주황 칩의 4 … 처럼 색이 곧 대상 영역이다.
+ */
+export function BonusIcon({ b, theme }: { b: Bonus | null | undefined; theme: Theme }) {
+  if (!b) return null;
+  const tip = bonusTip(b, theme);
+  const chip = (cls: string, text: string) => (
+    <span className={'bicon ' + cls} title={tip}>{text}</span>
+  );
   switch (b.t) {
-    case 'x': return { yellow: '✗노', blue: '✗파', green: '✗초' }[b.area];
-    case 'xAny': return '✗?';
-    case 'num': return (b.area === 'orange' ? '주' : '보') + b.v;
-    case 'numAny': return '?' + b.v;
-    case 'fox': return '★';
-    case 'reroll': return '↻';
-    case 'plusOne': return '+1';
+    case 'x': return chip('b-' + b.area, '✕');
+    case 'xAny': return chip('b-any', '✕');
+    case 'num': return chip('b-' + b.area, String(b.v));
+    case 'numAny': return chip('b-any', String(b.v));
+    case 'fox': return <span className="bicon b-fox" title={tip}>{theme.fox.icon}</span>;
+    case 'reroll': return chip('b-act', '↻');
+    case 'plusOne': return chip('b-act', '+1');
   }
 }
 
@@ -119,7 +127,9 @@ export function Sheet({
             {Array.from({ length: 6 }, (_, i) => {
               const rb = ROUND_BONUS[i];
               const pair = Array.isArray(rb);
-              const label = pair ? bonusLabel(rb[0]) + ' / ' + bonusLabel(rb[1]) : bonusLabel(rb as Bonus);
+              const icons = pair
+                ? <><BonusIcon b={rb[0]} theme={theme} /><BonusIcon b={rb[1]} theme={theme} /></>
+                : rb ? <BonusIcon b={rb as Bonus} theme={theme} /> : <span className="none">—</span>;
               const head = `${i + 1}${theme.terms.round} 시작`;
               const tip = pair
                 ? `${head}: 둘 중 하나를 고릅니다.\n· ${bonusTip(rb[0], theme)}\n· ${bonusTip(rb[1], theme)}`
@@ -130,7 +140,7 @@ export function Sheet({
                 <i key={i} title={tip}
                   className={'box' + (i + 1 < round ? ' done' : '') + (i + 1 === round ? ' now' : '') + (i + 1 > totalRounds ? ' off' : '')}>
                   <b>{i + 1}</b>
-                  <u>{label || '—'}</u>
+                  <u>{icons}</u>
                 </i>
               );
             })}
@@ -167,14 +177,14 @@ export function Sheet({
                     </button>
                   );
                 })}
-                <span className="rowbonus" title={bonusTip(YELLOW_ROW_BONUS[r], theme)}>{bonusLabel(YELLOW_ROW_BONUS[r])}</span>
+                <span className="rowbonus"><BonusIcon b={YELLOW_ROW_BONUS[r]} theme={theme} /></span>
               </div>
             ))}
             <div className="grid-row foot">
               {YELLOW_COL_SCORE.map((sc, c) => (
                 <span key={c} className={'colscore' + (s.yellow.every((row) => row[c]) ? ' won' : '')}>{sc}</span>
               ))}
-              <span className="rowbonus" title={bonusTip(YELLOW_DIAG_BONUS, theme)}>{bonusLabel(YELLOW_DIAG_BONUS)}</span>
+              <span className="rowbonus"><BonusIcon b={YELLOW_DIAG_BONUS} theme={theme} /></span>
             </div>
           </div>
           <p className="area-note dim">세로 줄을 다 채우면 <b>아래 숫자가 점수</b>, 가로 줄은 <b>오른쪽</b> 보너스, 대각선은 맨 오른쪽 아래 보너스입니다.</p>
@@ -209,11 +219,11 @@ export function Sheet({
                     </button>
                   );
                 })}
-                <span className="rowbonus" title={bonusTip(BLUE_ROW_BONUS[r], theme)}>{bonusLabel(BLUE_ROW_BONUS[r])}</span>
+                <span className="rowbonus"><BonusIcon b={BLUE_ROW_BONUS[r]} theme={theme} /></span>
               </div>
             ))}
             <div className="grid-row foot">
-              {BLUE_COL_BONUS.map((b, c) => <span key={c} className="colscore bonus" title={bonusTip(b, theme)}>{bonusLabel(b)}</span>)}
+              {BLUE_COL_BONUS.map((b, c) => <span key={c} className="colscore bonus"><BonusIcon b={b} theme={theme} /></span>)}
               <span className="rowbonus" />
             </div>
           </div>
@@ -228,7 +238,7 @@ export function Sheet({
               <div key={i} className={'slot' + (i < s.green ? ' on' : '') + (i === s.green ? ' next' : '')}>
                 <span className="sc">{GREEN_SCORE[i + 1]}</span>
                 <span className="val">≥{min}</span>
-                <span className="bn" title={bonusTip(GREEN_BONUS[i], theme)}>{bonusLabel(GREEN_BONUS[i])}</span>
+                <span className="bn"><BonusIcon b={GREEN_BONUS[i]} theme={theme} /></span>
               </div>
             ))}
           </div>
@@ -242,7 +252,7 @@ export function Sheet({
               <div key={i} className={'slot' + (s.orange[i] !== null ? ' on' : '')}>
                 <span className="sc">{m > 1 ? '×' + m : ''}</span>
                 <span className="val">{s.orange[i] ?? ''}</span>
-                <span className="bn" title={bonusTip(ORANGE_BONUS[i], theme)}>{bonusLabel(ORANGE_BONUS[i])}</span>
+                <span className="bn"><BonusIcon b={ORANGE_BONUS[i]} theme={theme} /></span>
               </div>
             ))}
           </div>
@@ -256,7 +266,7 @@ export function Sheet({
               <div key={i} className={'slot' + (s.purple[i] !== null ? ' on' : '')}>
                 <span className="sc" />
                 <span className="val">{s.purple[i] ?? ''}</span>
-                <span className="bn" title={bonusTip(b, theme)}>{bonusLabel(b)}</span>
+                <span className="bn"><BonusIcon b={b} theme={theme} /></span>
               </div>
             ))}
           </div>
