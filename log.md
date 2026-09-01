@@ -1,245 +1,168 @@
-# 작업 로그 / 재개용 안내
+# 작업 이력
 
-이 문서는 **다시 작업을 시작할 때 가장 먼저 읽는 문서**다.
-무엇이 어디에 있고, 어떻게 띄우고, 무엇이 남아 있는지를 담았다.
+무엇을 왜 고쳤는지의 기록이다.
+**띄우고 배포하고 수업에 쓰는 방법은 [`progress.md`](progress.md) 에 있다.**
 
 - 최종 갱신: 2026-09-01
-- 규칙 정리 문서: [`docs/RULES.md`](docs/RULES.md)
-- 프로젝트 개요·배포 절차: [`README.md`](README.md)
+- 상세는 `git show <해시>` 로 본다. 커밋 메시지에 원인·근거·검증값을 적어두었다.
 
 ---
 
-## 1. 지금 어디서 돌아가고 있나
+## 이 프로젝트에서 배운 것 (다시 작업할 때 유의)
 
-| 항목 | 값 |
-|---|---|
-| 서비스 주소 | https://marvelous-rabanadas-6be02f.netlify.app |
-| 소스 저장소 | https://github.com/gud1396-coder/fox-webapp (**공개**) |
-| 로컬 작업 폴더 | `C:\claude\claude\fox-webapp` |
-| 프론트 호스팅 | Netlify — 프로젝트명 `marvelous-rabanadas-6be02f` |
-| 서버 | Cloudflare Worker `fox-server` |
-| 서버 주소 | https://fox-server.gud1396.workers.dev |
-| Cloudflare 계정 | gud1396@hanilgo.cnehs.kr (`1444c3f0a48c411e2a07712d73d0e066`) |
-
-`main` 에 푸시하면 **Netlify 가 자동 재배포**된다.
-**Worker 는 자동 배포되지 않는다** — 아래 3절 참고.
-
-### 설정값이 저장된 위치
-
-| 설정 | 어디에 있나 |
-|---|---|
-| `VITE_SERVER_URL` | Netlify → Project configuration → Environment variables |
-| `ALLOWED_ORIGINS` | `apps/server/wrangler.toml` 의 `[vars]` |
-| `ADMIN_PASSWORD` | Cloudflare Worker 시크릿 (`wrangler secret`) — **값은 이 문서에 적지 않는다** |
-| ~~`CLOUDFLARE_API_TOKEN`~~ | 더 이상 쓰지 않는다. 자동 배포를 걷어냈다 (5절) |
-
-> 저장소가 공개이므로 비밀번호·토큰을 파일에 적지 말 것.
-> 관리자 비밀번호를 잊었으면 `npx wrangler secret put ADMIN_PASSWORD` 로 새로 넣으면 된다.
-> 단, 화면 잠금용으로 `apps/web/src/App.tsx` 의 `ADMIN_PW` 상수도 함께 고쳐야 한다.
-
----
-
-## 2. 파일이 어디에 있나
-
-```
-packages/engine/         규칙 엔진 (의존성 0). 서버와 클라이언트가 같이 쓴다.
-  src/sheet.ts           점수판 데이터. 숫자·보너스 위치가 전부 여기 상수로 있다.
-  src/types.ts           Action / Bonus / GameState 타입. 액션을 추가하면 여기부터.
-  src/reducer.ts         게임 진행 규칙. 턴·페이즈 전이, 모든 액션 처리.
-  src/sheetOps.ts        시트 조작과 보너스 연쇄. canUseDie() 도 여기.
-  src/score.ts           점수 계산 (영역별 · 여우 · 합계).
-  src/theme.ts           테마(원작 / 지구시스템)의 이름과 용어.
-  src/engine.test.ts     테스트 32개.
-
-apps/web/                React + Vite 클라이언트 → Netlify
-  src/App.tsx            로비·게임 화면 전체, 관리자 모드, 설명서. (가장 큰 파일)
-  src/Sheet.tsx          점수판 한 장을 그리는 컴포넌트. 보너스 배지·툴팁.
-  src/useRoom.ts         WebSocket 연결과 전송 큐. 로컬 모드 분기도 여기.
-  src/styles.css         전부 여기. 색 변수는 파일 맨 위 :root 에 있다.
-
-apps/server/             Cloudflare Worker + Durable Object → Cloudflare
-  src/index.ts           라우팅, 오리진 검사, 관리자 API, GameRoom DO.
-  wrangler.toml          Worker 설정. ALLOWED_ORIGINS 도 여기.
-
-docs/RULES.md            규칙 정리. 점수판 배치가 표로 정리돼 있다.
-netlify.toml             Netlify 빌드 설정 (건드릴 일 거의 없음).
-.github/workflows/       ci.yml — 푸시마다 테스트·빌드 검사. (자동 배포는 없앴다)
-```
-
-**어디를 고쳐야 하나**
-
-| 하고 싶은 일 | 고칠 파일 |
-|---|---|
-| 점수·보너스 위치 수정 | `packages/engine/src/sheet.ts` |
-| 규칙 자체를 바꾸기 | `packages/engine/src/reducer.ts` |
-| 새 액션 추가 | `types.ts` 에 타입 → `reducer.ts` 에 처리 → `App.tsx` 에 버튼 |
-| 화면 배치·색 | `apps/web/src/styles.css` |
-| 점수판 모양 | `apps/web/src/Sheet.tsx` |
-| 로비·관리자·설명서 | `apps/web/src/App.tsx` |
-| 서버 API | `apps/server/src/index.ts` |
-
----
-
-## 3. 작업 재개 절차
-
-```bash
-cd C:\claude\claude\fox-webapp
-npm install                  # 처음 한 번만
-
-npm test                     # 엔진 테스트 (빠름, 먼저 돌려볼 것)
-npm run dev:server           # 로컬 서버 → localhost:8787
-npm run dev:web              # 클라이언트 → localhost:5173
-```
-
-로컬에서 **온라인 모드**로 테스트하려면 서버 주소를 넘겨서 띄운다.
-`wrangler.toml` 의 `ALLOWED_ORIGINS` 가 Netlify 도메인으로 고정돼 있으므로
-로컬 서버는 오리진을 덮어써야 한다.
-
-```bash
-# 터미널 1
-cd apps/server && npx wrangler dev --port 8787 --var ALLOWED_ORIGINS:http://localhost:5173
-
-# 터미널 2
-cd apps/web && VITE_SERVER_URL=ws://localhost:8787 npx vite --port 5173
-```
-
-PowerShell 이면 두 번째 줄은 이렇게:
-
-```powershell
-cd apps/web; $env:VITE_SERVER_URL='ws://localhost:8787'; npx vite --port 5173
-```
-
-### 배포
-
-```bash
-npm test && npm run build:web        # 먼저 검증
-git push origin main                 # → Netlify 자동 재배포
-
-# 엔진이나 서버를 고쳤으면 Worker 도 반드시 따로 배포해야 한다
-npm run deploy:server                # 엔진 빌드 + Worker 배포를 한 번에
-```
-
-> **엔진(`packages/engine`)을 고치면 Worker 재배포가 필수다.**
-> 서버가 같은 엔진을 번들해서 쓰기 때문에, 프론트만 배포하면 규칙이 어긋난다.
-
----
-
-## 4. 운영 중 알아둘 것
-
-### 관리자 모드
-로비 맨 아래 "관리자 모드" → 비밀번호 입력. 세 가지를 할 수 있다.
-
-- **테마 선택** — 수업 중 학생이 못 바꾸도록 여기로 옮겨두었다.
-- **이 브라우저 정보 삭제** — `localStorage`(이름·플레이어ID·테마)만 지운다. **나만 영향.**
-- **모든 방 초기화** — 서버의 모든 방 진행 상황을 지운다. **전원 영향.** 브라우저 정보는 안 지운다.
-- **서버 연결 차단 on/off** — 켜면 새 접속이 503 으로 막힌다. 수업 시간 외 사용 제한용.
-  **이미 접속 중인 사람은 안 끊긴다.** 끊으려면 "모든 방 초기화" 를 같이 누른다.
-
-### 서버 API (직접 호출할 일이 있으면)
-
-> 이 PC 의 git-bash `curl` 은 schannel 문제로 Worker 에 닿지 못한다(5절).
-> 브라우저 콘솔이나 `node -e "fetch(...)"` 를 쓰거나, `curl.exe` 대신
-> PowerShell 의 `Invoke-RestMethod` 를 쓴다.
-
-```bash
-curl https://fox-server.gud1396.workers.dev/health           # ok
-curl https://fox-server.gud1396.workers.dev/admin/lock       # {"locked":false}
-
-curl -X POST -H "content-type: application/json" \
-  -H "Origin: https://marvelous-rabanadas-6be02f.netlify.app" \
-  -d '{"password":"...","locked":true}' \
-  https://fox-server.gud1396.workers.dev/admin/lock
-```
-
-### 방 상태는 계속 남는다
-Durable Object 가 방마다 상태를 영구 저장한다. 같은 방 코드로 다시 들어가면
-지난 게임이 이어진다. 새로 시작하려면 **방 코드를 바꾸거나 "모든 방 초기화"** 를 쓴다.
-
----
-
-## 5. 알려진 문제 / 남은 일
-
-**1. Worker 자동 배포는 없다 (의도된 상태)**
-`CLOUDFLARE_API_TOKEN` 이 유효하지 않아 `deploy-server` 워크플로가 매번 실패했다.
-토큰을 다시 발급하는 대신 워크플로를 걷어냈다. **Worker 는 CLI 로 배포한다.**
-
-```bash
-npm run deploy:server
-```
-
-`ci.yml`(테스트·빌드 검사)은 그대로 돌아간다.
-
-나중에 자동 배포를 되살리려면 워크플로 파일을 되돌리고 토큰을 넣으면 된다.
-
-```bash
-git show e0cedb7:.github/workflows/deploy-server.yml > .github/workflows/deploy-server.yml
-```
-
-토큰은 https://dash.cloudflare.com/profile/api-tokens 에서 **Edit Cloudflare Workers**
-템플릿으로 발급해 리포 Secrets 의 `CLOUDFLARE_API_TOKEN` 에 넣는다. 발급 후
-`curl -H "Authorization: Bearer <토큰>" https://api.cloudflare.com/client/v4/user/tokens/verify`
-로 `"success": true` 인지 먼저 확인할 것. (지난번 실패 원인이 이 값이었다.)
-
-**2. 관리자 패널의 화면 잠금은 클라이언트 검사다**
-`App.tsx` 의 `ADMIN_PW` 상수와 비교하므로 개발자도구로 볼 수 있다.
-다만 **방 초기화·서버 차단은 서버가 비밀번호를 다시 검증**하므로 실제 파괴적 동작은 막혀 있다.
-더 단단히 하려면 패널 잠금도 서버 검증으로 바꾸면 되는데, 그러면 로컬 모드에서 관리자 모드를 못 쓴다.
-
-**3. 같은 브라우저의 여러 탭은 같은 사람으로 잡힌다**
-`localStorage` 의 `fox.pid` 를 공유하기 때문. 혼자 테스트할 때는 시크릿 창을 쓴다.
-
-**4. 진행 중 합류한 사람은 놓친 라운드 보너스를 못 받는다**
-그 턴은 건너뛴 것으로 처리되고 다음 턴부터 참여한다. 라운드 수는 시작 시점 인원으로
-정해져 나중에 들어와도 바뀌지 않는다. 의도된 동작이지만 불만이 나오면 손볼 지점.
-
-**5. (해결됨) workers.dev 차단은 오진이었다**
-한때 이 PC 에서 `curl` 로 Worker 에 닿지 않아 "학교 망이 workers.dev 를 차단한다" 고
-기록했으나 사실이 아니다. 원인은 **git-bash 의 curl 이 Windows schannel 백엔드를
-쓰는 것**이다 (`libcurl/8.21.0 Schannel`).
+**1. 서버 도달성은 `curl` 결과만 믿지 말 것**
+이 PC 의 git-bash `curl` 은 Windows schannel 백엔드를 써서(`libcurl/8.21.0 Schannel`)
+Cloudflare Worker 와 TLS 핸드셰이크가 안 된다. 이것 때문에 "학교 망이 `workers.dev` 를
+차단한다" 고 한동안 잘못 기록했다. 브라우저와 Node 는 멀쩡하다.
 
 ```
 Chrome → 200 "ok" 223ms, WebSocket 개통 969ms
 Node   → 200 "ok" 269ms
 curl   → TLS 핸드셰이크 실패
-프록시 → 없음
+프록시 → 없음 (ProxyEnable=0)
 ```
 
-**서버 도달성을 확인할 때 curl 결과만 믿지 말 것.** 브라우저나 `node -e "fetch(...)"`
-로 교차 확인한다. 실제 사용자는 브라우저를 쓰므로 브라우저 결과가 기준이다.
+실제 사용자는 브라우저를 쓰므로 **브라우저 결과가 기준**이다.
+`node -e "fetch('...').then(r=>r.text()).then(console.log)"` 로 교차 확인한다.
 
-**6. wrangler 가 3.114.17 이다**
-4.x 업데이트 권고가 뜨지만 현재 배포에는 문제없다.
+**2. 브라우저 자동화로 잰 값은 탭이 보이는 상태인지 확인할 것**
+백그라운드 탭(`document.hidden === true`)에서는 `ResizeObserver` 가 발화하지 않는다.
+화면 맞춤 배율이 재계산되지 않아 "레이아웃이 깨졌다" 고 오판할 뻔했다.
+
+**3. 엔진을 고치면 Worker 재배포가 필수**
+서버가 `packages/engine` 을 번들해서 쓴다. 프론트만 배포하면 규칙이 어긋난다.
+`npm run deploy:server` 가 엔진 빌드까지 묶어서 한다.
+
+**4. 규칙은 실물과 룰북 양쪽으로 확인할 것**
+PDF 벡터 텍스트만으로는 아이콘으로 그려진 보너스 위치를 알 수 없었고,
+초기값이 한 칸씩 밀려 있었다. 실물 점수판 이미지 확대 판독으로 확정했다.
 
 ---
 
-## 6. 지금까지 한 일
+## 1. 규칙 정확성
 
-`git log` 에 상세 내용이 있다. 특정 커밋은 `git show <해시>` 로 본다.
+**`f03ab7a` 점수판 배치를 실물로 확정**
+`sheet.ts` 의 `TODO()` 임시값 5곳을 실물 점수판(BGG pic3941962) 확대 판독으로 교체.
+공식 영문 룰북(Schmidt 88198) 전문을 추출해 교차 검증했다.
 
-### 규칙 정확성
-- `f03ab7a` **점수판 배치 확정** — 실물 점수판 이미지를 확대 판독해 `sheet.ts` 의 임시값
-  5곳을 교체. 초록·주황·보라가 공통적으로 한 칸씩 밀려 있었고, 보라는 보너스가
-  5개가 아니라 9개였다. 회귀 테스트 5개 추가.
-- `9729044` **은쟁반 특례 강제** — 룰북상 은쟁반에 쓸 수 있는 주사위가 있으면 액티브의
-  주사위를 가져갈 수 없다. 주석에 의도만 있고 구현이 없었다. `canUseDie()` 추가.
+- 초록·주황·보라의 임시값이 공통적으로 **한 칸씩 밀려** 있었다.
+- 보라는 보너스가 5개인 줄 알았으나 실제로는 **11칸 중 9칸**에 있었다.
+- 주황 `×3` 은 10번이 아니라 **11번(마지막) 칸**이었다.
+- 라운드 트래커 5·6칸의 점 아이콘은 보너스가 아니라 **진행 인원 표시**였다.
+- 여우는 시트 전체에 **5마리** (노랑 행4 / 파랑 행3 / 초록 7 / 주황 8 / 보라 7).
 
-### 접속·진행 버그
-- `8c16151` **참가가 서버로 안 가던 문제** — 방에 들어갔다 곧바로 튕겨나오던 증상.
-  스테일 클로저와 50ms 경쟁이 원인. 전송 큐를 도입했다.
-- `a0e58bc` 새로고침 재접속 허용 / `962b143` 진행 중 합류 허용
-- `6778866` 종료 화면이 `7/6` 으로 표시되던 문제
+회귀 테스트 5개를 추가하고 `docs/RULES.md` 의 `[미확인]` 표기를 전부 걷었다.
 
-### UI
-- `60cf278` 실물 배치 반영, 컨트롤바 분리 · `b5c0b07` 보너스 색 배지, 설명서 모달
-- `d8d9f76` 노랑→빨강, 화면 맞춤 자동 배율 · `e145548` 여백 정리
-- `97da4bd` 수권 점수표를 세로 2열로 · `fb9c532` 좌우 컨트롤바 + 플레이어별 탭
+**`9729044` 패시브의 은쟁반 특례 강제**
+룰북: *은쟁반의 어떤 주사위도 쓸 수 없을 때만* 액티브의 주사위 칸에서 가져올 수 있고,
+쓸 수 있는데 일부러 거르는 것은 금지다. 주석에 의도만 적혀 있고 구현이 없어서,
+패시브가 언제든 액티브의 주사위를 가져갈 수 있었다.
+`sheetOps.ts` 에 `canUseDie()` 를 추가해 `pickPlatter` · `skipPlatter` 양쪽을 막았다.
+클라이언트도 같은 판정을 써서 못 고르는 주사위는 버튼으로 내보내지 않는다.
 
-### 운영
-- `467968e` 관리자 모드 · `6778866` 서버 차단, 눈 다시 입력
+---
 
-### 실물 반영 (주사위 세트에 맞춤)
-- 흰색 → **핑크** (`white` 식별자는 그대로)
-- 노랑 → **빨강** (`yellow` 식별자는 그대로)
+## 2. 접속·진행 버그
 
-> 색 이름을 또 바꿔야 하면 `App.tsx` 의 `DIE_KO`, `styles.css` 의 `:root` 색 변수,
-> `theme.ts` 의 `areas.<색>.name` 세 곳을 함께 고친다. 엔진 식별자는 건드리지 않는다.
+**`8c16151` 참가가 서버로 전달되지 않던 문제** — 가장 컸던 버그
+방에 들어갔다가 **262ms 만에 로비로 튕겨나오는** 증상. 서버 방은 계속 비어 있었다.
+
+원인이 두 겹이었다.
+- `onJoin` 이 `setJoined(true)` 직후 50ms 뒤에 `send` 를 호출했는데, 그 `send` 는 클릭
+  시점 렌더에서 만들어진 **로컬 모드용**이었다(스테일 클로저). join 이 브라우저 안
+  엔진에만 적용돼 게임 화면이 잠깐 떴다가, 곧 도착한 서버의 최초 state 에 덮여 사라졌다.
+- 설령 클로저가 최신이어도 소켓이 아직 안 열려서 `send` 가 액션을 **버렸다**.
+
+참가를 다음 렌더의 이펙트로 옮기고 `useRoom` 에 전송 큐를 넣었다.
+
+**`a0e58bc` 새로고침 재접속** — `join` 이 페이즈를 먼저 검사해 재접속이 막혔다. 순서를 뒤집었다.
+
+**`962b143` 진행 중 합류** — 한 명이 먼저 시작하면 나머지가 전부 막혔다.
+`gameOver` 만 거부하고, 합류자는 그 턴을 마친 것으로 두어 남의 진행을 막지 않게 했다.
+
+**`6778866` 종료 화면이 `7/6` 으로 표시** — `round++` 를 하고 종료를 판정해서
+없는 라운드가 표시됐다. 올리기 전에 판정하도록 바꿨다.
+
+**`64240c1` 로비에 항상 "로컬 모드" 로 표시**
+`useRoom(joined ? code : '')` 라 참가 전에는 코드가 빈 값이고 `online` 이 무조건
+`false` 였다. 서버가 설정된 배포본에서도 **모든 접속자**가 "이 브라우저에서만
+진행됩니다" 를 먼저 봤다. `HAS_SERVER` 로 판정을 분리하고, 학생에게 의미 없는
+`VITE_SERVER_URL` 문구를 뺐다.
+
+---
+
+## 3. UI
+
+**`60cf278`** 실물 점수판 배치 반영(노랑|파랑 위, 초록·주황·보라 아래), 컨트롤바 분리,
+라운드 트랙과 액션 바(각 7칸) 추가, 실시간 점수표 탭, 규칙 툴팁, 방 나가기.
+**`b5c0b07`** 설명서를 중앙 모달로, 보너스를 `X초`·`주5` 대신 **색 배지**로.
+**`edc398d` `0aeb6b5` `4ecccd2` `76b4d54`** 칸 경계·크기·라운드 트랙 비율 조정.
+**`d8d9f76`** 노랑 → 빨강, 화면 맞춤 자동 배율(0.4~1.8배, `zoom`).
+**`e145548`** 여백 정리 — `1fr 1fr` 그리드가 상자를 억지로 늘리던 것을 내용 크기로.
+시트 폭 1198 → 869px.
+**`97da4bd`** 수권 점수표를 격자 오른쪽 세로 2열로. 869 → 659px. 상자 높이도 맞췄다.
+**`fb9c532`** 좌우 2단 컨트롤바 + 플레이어별 탭.
+1366×768 실측에서 왼쪽 바가 779/712 로 넘쳤던 것을 좌 190px(이동) / 우 300px(주사위)
+로 나눠 **양쪽 712/712** 로 맞췄다.
+**`6778866`** 은쟁반을 오른쪽 바 최상단으로(Netlify 배지와 겹쳐 가려졌다),
+관측 주기를 세로 목록으로, **눈 다시 입력** 버튼 추가.
+
+### 실물 주사위에 맞춘 표기
+흰색 → **핑크**, 노랑 → **빨강**. 엔진 식별자(`white`, `yellow`)는 그대로다.
+
+---
+
+## 4. 운영 기능
+
+**`467968e` 관리자 모드** — 테마 선택, 브라우저 정보 삭제, 모든 방 초기화.
+방을 전부 지우려면 어떤 방이 열려 있는지 알아야 하는데 Durable Object 는 목록 조회가
+안 된다. `__index__` 인스턴스에 방 코드를 모아두고(접속 때 `waitUntil` 로 기록해
+응답 지연 없음) 초기화 시 전부 순회한다.
+비밀번호는 공개 저장소에 남지 않도록 **Worker 시크릿**으로 넣었다.
+
+**`6778866` 서버 연결 차단 on/off** — 수업 시간 외 사용 제한용.
+검증: 차단 시 `503`, 해제 시 `101` 로 복구.
+
+**`3e93974` 로비를 대기실로** — 실시간 참가자 목록, 혼자면 시작 잠금.
+
+**`76f9211` 연결 진단 버튼** — 기기별 서버 도달성 확인.
+(workers.dev 차단 오진 때 만들었지만, 접속 문제 분류에 계속 쓸모가 있어 남겼다.)
+
+**`5fe4c83` Worker 자동 배포 제거**
+`CLOUDFLARE_API_TOKEN` 이 유효하지 않아(`code 9106`) `deploy-server` 워크플로가 푸시마다
+실패했다. 토큰 재발급 대신 워크플로를 걷어내고 `npm run deploy:server` 로 대체했다.
+`ci.yml`(테스트·빌드 검사)은 그대로 둔다.
+
+되살리려면:
+```bash
+git show e0cedb7:.github/workflows/deploy-server.yml > .github/workflows/deploy-server.yml
+```
+토큰은 https://dash.cloudflare.com/profile/api-tokens 의 **Edit Cloudflare Workers**
+템플릿으로 발급하고, 등록 전에 반드시 확인한다.
+```bash
+curl -H "Authorization: Bearer <토큰>" https://api.cloudflare.com/client/v4/user/tokens/verify
+```
+
+---
+
+## 5. 정정된 기록
+
+**`aa5234f` workers.dev 차단은 오진이었다**
+`curl` 결과만 보고 "학교 망이 `workers.dev` 를 SNI 단위로 차단한다" 고 판단해
+커스텀 도메인 연결이나 망 관리자 요청을 검토했으나, **문제 자체가 없었다.**
+원인은 위 "배운 것" 1번의 schannel 이슈다. 대응은 필요 없었다.
+
+---
+
+## 6. 배포 이력
+
+| 대상 | 방법 |
+|---|---|
+| GitHub | `cd1c866`(원격 초기 커밋) 위로 rebase 후 첫 푸시 |
+| Netlify | `main` 푸시마다 자동. `VITE_SERVER_URL` 등록 후 캐시 없이 재배포 |
+| Netlify 공개 전환 | Private → **Public** (기본이 Private 이라 학생이 못 들어왔다) |
+| Cloudflare Worker | CLI 로 여러 차례. 이후 `npm run deploy:server` 사용 |
+
+Netlify UI 가 `Sites` → **`Projects`** 로 바뀌어 있어 설정 경로를 찾기 어려웠다.
+환경변수는 **Project configuration → Environment variables**,
+공개 전환은 **Project configuration → General → Visitor access** 에 있다.
