@@ -137,6 +137,10 @@ npm run deploy:server                # 엔진 빌드 + Worker 배포를 한 번�
 
 ### 서버 API (직접 호출할 일이 있으면)
 
+> 이 PC 의 git-bash `curl` 은 schannel 문제로 Worker 에 닿지 못한다(5절).
+> 브라우저 콘솔이나 `node -e "fetch(...)"` 를 쓰거나, `curl.exe` 대신
+> PowerShell 의 `Invoke-RestMethod` 를 쓴다.
+
 ```bash
 curl https://fox-server.gud1396.workers.dev/health           # ok
 curl https://fox-server.gud1396.workers.dev/admin/lock       # {"locked":false}
@@ -188,11 +192,20 @@ git show e0cedb7:.github/workflows/deploy-server.yml > .github/workflows/deploy-
 그 턴은 건너뛴 것으로 처리되고 다음 턴부터 참여한다. 라운드 수는 시작 시점 인원으로
 정해져 나중에 들어와도 바뀌지 않는다. 의도된 동작이지만 불만이 나오면 손볼 지점.
 
-**5. 일부 네트워크에서 `*.workers.dev` 가 막힐 수 있다**
-작업 중 한 네트워크에서 TLS 핸드셰이크 단계부터 차단되는 것을 확인했다
-(무관한 `example.workers.dev` 도 동일). 교실에서 접속이 안 되면 이걸 의심할 것.
-휴대폰 데이터로 접속해보면 바로 판별된다. 해결은 관리자에게 허용 요청하거나
-Worker 에 커스텀 도메인을 붙이는 것.
+**5. (해결됨) workers.dev 차단은 오진이었다**
+한때 이 PC 에서 `curl` 로 Worker 에 닿지 않아 "학교 망이 workers.dev 를 차단한다" 고
+기록했으나 사실이 아니다. 원인은 **git-bash 의 curl 이 Windows schannel 백엔드를
+쓰는 것**이다 (`libcurl/8.21.0 Schannel`).
+
+```
+Chrome → 200 "ok" 223ms, WebSocket 개통 969ms
+Node   → 200 "ok" 269ms
+curl   → TLS 핸드셰이크 실패
+프록시 → 없음
+```
+
+**서버 도달성을 확인할 때 curl 결과만 믿지 말 것.** 브라우저나 `node -e "fetch(...)"`
+로 교차 확인한다. 실제 사용자는 브라우저를 쓰므로 브라우저 결과가 기준이다.
 
 **6. wrangler 가 3.114.17 이다**
 4.x 업데이트 권고가 뜨지만 현재 배포에는 문제없다.
