@@ -611,3 +611,30 @@ button.linkish {
 
 /* 남는 공간이 한쪽에 몰리지 않게 보드를 가운데 정렬 */
 .board { align-items: center; justify-content: center; }
+
+/* ---- 수권 점수표: 격자 오른쪽에 세로 2열 ---- */
+.blue-body { display: flex; gap: 14px; align-items: flex-start; }
+.bscale { display: flex; flex-direction: column; gap: 5px; padding-top: 2px; }
+.bs-title { font-size: 11px; color: var(--dim); white-space: nowrap; }
+.bs-grid {
+  display: grid; grid-template-rows: repeat(6, auto); grid-auto-flow: column;
+  gap: 2px 12px;
+}
+.bs-row {
+  display: flex; align-items: baseline; gap: 5px;
+  font-size: 12px; color: #7f8ca3; cursor: help; white-space: nowrap;
+}
+.bs-row b { min-width: 15px; text-align: right; font-weight: 600; color: #9fadc4; }
+.bs-row i { font-style: normal; font-weight: 700; }
+.bs-row.won { color: var(--blue); }
+.bs-row.won b { color: var(--blue); }
+.bs-row.now { color: #fff; background: var(--blue); border-radius: 4px; padding: 0 5px; margin: 0 -5px; }
+.bs-row.now b { color: #fff; }
+.bs-now { margin-top: 4px; font-size: 11px; color: var(--dim); white-space: nowrap; }
+.bs-now b { color: var(--blue); }
+
+/* 수권 상자 높이를 지권과 맞춘다 */
+.area-top { align-items: stretch; }
+.area-top .area { display: flex; flex-direction: column; }
+.blue-body { flex: 1; }
+.bscale { justify-content: space-between; }

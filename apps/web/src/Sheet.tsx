@@ -191,13 +191,7 @@ export function Sheet({
         {/* 파랑 */}
         <section className="area a-blue">
           <h4 title={areaTip('blue', theme)}>{theme.areas.blue.name} <em>{areas.blue}</em></h4>
-          <p className="area-note">체크한 칸 수 &rarr; 점수 (지금 <b>{blueCount}칸 = {areas.blue}점</b>)</p>
-          <div className="scale">
-            {BLUE_SCALE.slice(1).map((p, i) => (
-              <span key={i} className={'tick' + (blueCount >= i + 1 ? ' won' : '')}
-                title={(i + 1) + '칸을 체크하면 ' + p + '점'}>{p}</span>
-            ))}
-          </div>
+          <div className="blue-body">
           <div className="grid g4">
             {BLUE_GRID.map((row, r) => (
               <div className="grid-row" key={r}>
@@ -224,6 +218,24 @@ export function Sheet({
               {BLUE_COL_BONUS.map((b, c) => <span key={c} className="colscore bonus"><BonusIcon b={b} theme={theme} /></span>)}
               <span className="rowbonus" />
             </div>
+          </div>
+
+          {/* 점수표 — 격자 오른쪽 빈 공간에 세로 2열로 */}
+          <div className="bscale">
+            <div className="bs-title">칸 수 &rarr; 점수</div>
+            <div className="bs-grid">
+              {BLUE_SCALE.slice(1).map((p, i) => (
+                <span
+                  key={i}
+                  className={'bs-row' + (blueCount === i + 1 ? ' now' : blueCount > i + 1 ? ' won' : '')}
+                  title={i + 1 + '칸을 체크하면 ' + p + '점'}
+                >
+                  <b>{i + 1}</b><i>{p}</i>
+                </span>
+              ))}
+            </div>
+            <div className="bs-now">지금 <b>{blueCount}칸 = {areas.blue}점</b></div>
+          </div>
           </div>
         </section>
         </div>
