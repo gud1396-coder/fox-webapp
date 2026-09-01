@@ -5,7 +5,7 @@ import {
   ORANGE_MULT, ORANGE_BONUS, ORANGE_SLOTS,
   PURPLE_BONUS, PURPLE_SLOTS,
 } from './sheet.js';
-import type { Sheet, Player, Bonus, ChoiceAnswer } from './types.js';
+import type { Sheet, Player, Bonus, ChoiceAnswer, DieColor } from './types.js';
 import { RuleError } from './types.js';
 
 export function createSheet(): Sheet {
@@ -140,6 +140,45 @@ export function purpleNeeds(sheet: Sheet): number | null {
   if (i === 0) return 1;
   const prev = sheet.purple[i - 1] as number;
   return prev === 6 ? 1 : prev + 1;
+}
+
+/**
+ * 이 시트에 해당 주사위를 어느 영역에든 합법적으로 기입할 수 있는가.
+ *
+ * 룰북의 특례("은쟁반의 어떤 주사위도 쓸 수 없을 때만 액티브의 주사위 칸에서
+ * 가져올 수 있다")를 판정하는 데 쓴다. blueWhiteSum 은 파랑+흰색의 합이며,
+ * 파랑 영역은 언제나 이 합으로만 기입한다.
+ */
+export function canUseDie(
+  sheet: Sheet,
+  die: DieColor,
+  value: number,
+  blueWhiteSum: number,
+): boolean {
+  const asYellow = () => yellowCandidates(sheet, value).length > 0;
+  const asBlue = () => {
+    const cell = findBlueCell(blueWhiteSum);
+    return !!cell && !sheet.blue[cell.r][cell.c];
+  };
+  const asGreen = () => {
+    const need = greenNeeds(sheet);
+    return need !== null && value >= need;
+  };
+  const asOrange = () => nextOrange(sheet) >= 0;
+  const asPurple = () => {
+    const need = purpleNeeds(sheet);
+    return need !== null && value >= need;
+  };
+
+  switch (die) {
+    case 'yellow': return asYellow();
+    case 'blue': return asBlue();
+    case 'green': return asGreen();
+    case 'orange': return asOrange();
+    case 'purple': return asPurple();
+    // 흰색은 조커 — 파랑에는 합으로, 나머지 색에는 자기 눈으로 들어간다.
+    case 'white': return asYellow() || asBlue() || asGreen() || asOrange() || asPurple();
+  }
 }
 
 // ---------- 보너스 체인 ----------

@@ -2,7 +2,9 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { createGame, reduce } from './reducer.js';
 import { areaScores, totalScore } from './score.js';
-import { createSheet, drain, findBlueCell, markYellow, writePurple } from './sheetOps.js';
+import {
+  createSheet, drain, findBlueCell, markYellow, writePurple, canUseDie, yellowCandidates,
+} from './sheetOps.js';
 import {
   BLUE_SCALE, GREEN_SCORE, YELLOW_COL_SCORE, totalRounds,
   GREEN_MIN, GREEN_BONUS, ORANGE_MULT, ORANGE_BONUS, PURPLE_BONUS,
@@ -267,4 +269,55 @@ test('라운드 트래커: 1·3 재굴림, 2 +1, 4 는 2택, 5·6 없음', () =>
   assert.ok(Array.isArray(ROUND_BONUS[3]));
   assert.equal(ROUND_BONUS[4], null);
   assert.equal(ROUND_BONUS[5], null);
+});
+
+// ---- 룰북 특례: 은쟁반을 쓸 수 있으면 액티브의 주사위를 못 가져온다 ----
+
+test('canUseDie: 초록은 최소 요구값, 노랑은 빈 칸 유무로 판정', () => {
+  const sheet = createSheet();
+  assert.equal(canUseDie(sheet, 'green', 1, 7), true, '첫 칸은 >=1');
+  assert.equal(canUseDie(sheet, 'yellow', 3, 7), true, '3 이 격자에 있다');
+  // 노랑 3 두 칸을 모두 채우면 더는 쓸 수 없다
+  const p = P();
+  for (const c of yellowCandidates(p.sheet, 3)) markYellow(p, c.r, c.c, 3);
+  assert.equal(canUseDie(p.sheet, 'yellow', 3, 7), false);
+});
+
+test('은쟁반에 쓸 수 있는 주사위가 있으면 액티브 칸에서 못 가져온다', () => {
+  let s = started();
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(6) });
+  s = reduce(s, { t: 'pick', playerId: 'a', die: 'purple', as: 'purple' });
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(5) });
+  s = reduce(s, { t: 'pick', playerId: 'a', die: 'orange', as: 'orange' });
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(4) });
+  s = reduce(s, { t: 'pick', playerId: 'a', die: 'green', as: 'green' });
+  assert.equal(s.phase, 'passive');
+  assert.ok(s.platter.length > 0, '은쟁반이 비어 있지 않다');
+
+  // 액티브가 시트에 올린 주사위를 패시브가 가져가려 하면 거부된다
+  const placed = s.placed[0];
+  assert.throws(
+    () => reduce(s, { t: 'pickPlatter', playerId: 'b', die: placed, as: placed as never }),
+    RuleError,
+    '은쟁반에 쓸 수 있는 게 있으므로 거부',
+  );
+
+  // 은쟁반에서 고르는 것은 정상 (흰색은 조커라 주황으로 쓴다)
+  const ok = s.platter.find((d) => d !== 'yellow' && d !== 'blue')!;
+  const next = reduce(s, {
+    t: 'pickPlatter', playerId: 'b', die: ok,
+    as: ok === 'white' ? 'orange' : (ok as never),
+  });
+  assert.ok(next.players[1].pickedThisTurn);
+});
+
+test('쓸 수 있는 주사위가 있으면 넘기기(skipPlatter)도 거부된다', () => {
+  let s = started();
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(6) });
+  s = reduce(s, { t: 'pick', playerId: 'a', die: 'purple', as: 'purple' });
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(5) });
+  s = reduce(s, { t: 'pick', playerId: 'a', die: 'orange', as: 'orange' });
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(4) });
+  s = reduce(s, { t: 'pick', playerId: 'a', die: 'green', as: 'green' });
+  assert.throws(() => reduce(s, { t: 'skipPlatter', playerId: 'b' }), RuleError);
 });

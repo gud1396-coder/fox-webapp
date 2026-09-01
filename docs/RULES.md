@@ -255,18 +255,21 @@
 
 ---
 
-## 구현과 룰북의 차이 (미해결)
+## 구현 메모
 
-**패시브 플레이어가 액티브의 주사위 칸에서 가져오는 조건** — `reducer.ts` `pickPlatter`
+**패시브가 액티브의 주사위 칸에서 가져오는 조건** — `reducer.ts` `pickPlatter`
 
 룰북: *"If a passive player can't use any die from the Silver Platter, they may use one die
 from the active player's Score sheet. It is not possible to voluntarily refuse a die from
 the Silver Platter to do this."*
 
-즉 **은쟁반의 어떤 주사위도 쓸 수 없을 때만** 액티브의 주사위 칸에서 가져올 수 있고,
-쓸 수 있는데 일부러 거르는 것은 금지다. 현재 코드는 주석에 이 의도가 적혀 있지만
-조건이 구현돼 있지 않아, 패시브가 언제든 액티브의 주사위를 가져갈 수 있다.
-(`skipPlatter` 도 마찬가지로 사용 가능 여부를 검사하지 않는다.)
+`sheetOps.ts` 의 `canUseDie()` 로 "이 시트에 이 주사위를 어느 영역에든 합법적으로
+기입할 수 있는가"를 판정해 이 특례를 강제한다.
 
-구현하려면 "이 플레이어가 이 주사위를 어느 영역에든 합법적으로 놓을 수 있는가"를
-판정하는 헬퍼가 필요하다. 현재 엔진에는 없다.
+- `pickPlatter`: 은쟁반에 쓸 수 있는 주사위가 하나라도 있으면 액티브의 주사위 칸에서
+  가져올 수 없다.
+- `skipPlatter`: 은쟁반·액티브 칸을 통틀어 쓸 수 있는 게 하나도 없을 때만 넘길 수 있다.
+- 클라이언트도 같은 판정을 써서, 못 고르는 주사위는 아예 버튼으로 내보내지 않는다.
+
+흰색(핑크)은 조커라 다섯 영역 중 하나라도 가능하면 사용 가능으로 친다. 파랑 영역은
+언제나 파랑+흰색의 합으로 판정한다.

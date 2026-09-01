@@ -1,6 +1,6 @@
 import { ROUND_BONUS, totalRounds } from './sheet.js';
 import {
-  advanceGreen, answerChoice, blocked, createSheet, drain,
+  advanceGreen, answerChoice, blocked, canUseDie, createSheet, drain,
   findBlueCell, markBlue, markYellow, writeOrange, writePurple,
 } from './sheetOps.js';
 import type { Action, Bonus, DieColor, GameState, Placement, Player } from './types.js';
@@ -81,6 +81,12 @@ function applyPlacement(s: GameState, p: Player, pl: Placement): void {
       break;
   }
   drain(p);
+}
+
+/** 목록 중 이 플레이어가 실제로 기입할 수 있는 주사위가 하나라도 있는가. */
+function anyUsable(s: GameState, p: Player, dice: DieColor[]): boolean {
+  const sum = s.dice.blue + s.dice.white;
+  return dice.some((d) => canUseDie(p.sheet, d, s.dice[d], sum));
 }
 
 // ---------- 페이즈 전이 ----------
@@ -273,9 +279,14 @@ export function reduce(state: GameState, action: Action): GameState {
       need(s.phase === 'passive', '지금은 은쟁반을 고를 때가 아닙니다');
       const p = find(s, action.playerId);
       need(!p.pickedThisTurn, '이미 이번 턴 기입을 마쳤습니다');
-      // 은쟁반의 어떤 것도 쓸 수 없을 때만 액티브의 주사위 칸에서 가져올 수 있다.
       need(s.platter.includes(action.die) || s.placed.includes(action.die),
         '은쟁반에 없는 주사위입니다');
+      // 은쟁반의 어떤 것도 쓸 수 없을 때만 액티브의 주사위 칸에서 가져올 수 있다.
+      // 쓸 수 있는데 일부러 거르는 것은 룰북상 금지다.
+      if (!s.platter.includes(action.die)) {
+        need(!anyUsable(s, p, s.platter),
+          '은쟁반에 쓸 수 있는 주사위가 있으면 그중에서 골라야 합니다');
+      }
       applyPlacement(s, p, action);
       p.pickedThisTurn = true;
       s.log.push(p.name + ' → ' + action.die + s.dice[action.die] + ' (' + action.as + ')');
@@ -287,6 +298,8 @@ export function reduce(state: GameState, action: Action): GameState {
       need(s.phase === 'passive', '지금은 넘길 때가 아닙니다');
       const p = find(s, action.playerId);
       need(!p.pickedThisTurn, '이미 기입을 마쳤습니다');
+      // 쓸 수 있는 주사위가 하나라도 있으면 넘길 수 없다.
+      need(!anyUsable(s, p, [...s.platter, ...s.placed]), '쓸 수 있는 주사위가 있습니다');
       p.pickedThisTurn = true;
       s.log.push(p.name + ' 기입 불가 — 넘어감');
       afterPassive(s);

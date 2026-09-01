@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DIE_COLORS, THEMES, ORIGINAL,
   yellowCandidates, hasFreeYellow, hasFreeBlue, findBlueCell,
-  BLUE_GRID, totalScore,
+  BLUE_GRID, totalScore, canUseDie,
 } from '@fox/engine';
 import type { AreaColor, DieColor, Dice, Player } from '@fox/engine';
 import { useRoom } from './useRoom.js';
@@ -147,9 +147,15 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
   const s = state as any;
 
   // 이번에 고를 수 있는 주사위 목록
+  // 은쟁반에 쓸 수 있는 주사위가 있으면 액티브의 주사위 칸에서는 가져올 수 없다(룰북 특례).
+  const sum = s.dice.blue + s.dice.white;
+  const usable = (d: DieColor) => canUseDie(me.sheet, d, s.dice[d], sum);
+  const platterUsable = s.platter.some(usable);
+
   const choosable: DieColor[] =
     s.phase === 'active' && isActive ? s.pool
-    : s.phase === 'passive' && !me.pickedThisTurn ? [...s.platter, ...s.placed]
+    : s.phase === 'passive' && !me.pickedThisTurn
+      ? (platterUsable ? s.platter : [...s.platter, ...s.placed])
     : s.phase === 'passive' && me.pickedThisTurn ? [...DIE_COLORS].filter((d) => !me.plusOneDice.includes(d))
     : [];
 
@@ -266,7 +272,8 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
             )}
 
             {/* 재굴림 · 추가 주사위 · 턴 종료 */}
-            <Actions state={state} me={me} isActive={isActive} playerId={playerId} send={send} theme={theme} />
+            <Actions state={state} me={me} isActive={isActive} playerId={playerId} send={send} theme={theme}
+              canPick={[...s.platter, ...s.placed].some(usable)} />
 
 
             <Platter state={state} theme={theme} playerId={playerId} />
@@ -578,7 +585,7 @@ function ChoiceBar({ me, send, playerId, theme }: any) {
   );
 }
 
-function Actions({ state, me, isActive, playerId, send, theme }: any) {
+function Actions({ state, me, isActive, playerId, send, theme, canPick }: any) {
   const canReroll = isActive && state.phase === 'active' && me.sheet.rerollEarned > me.sheet.rerollUsed;
   return (
     <div className="actions">
@@ -590,7 +597,7 @@ function Actions({ state, me, isActive, playerId, send, theme }: any) {
       {isActive && state.phase === 'active' && (
         <button onClick={() => send({ t: 'skipPick', playerId })}>쓸 수 있는 게 없음</button>
       )}
-      {state.phase === 'passive' && !me.pickedThisTurn && (
+      {state.phase === 'passive' && !me.pickedThisTurn && !canPick && (
         <button onClick={() => send({ t: 'skipPlatter', playerId })}>쓸 수 있는 게 없음</button>
       )}
       {state.phase === 'passive' && me.pickedThisTurn && !me.ready && !me.awaiting && me.queue.length === 0 && (
