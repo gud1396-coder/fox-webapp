@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DIE_COLORS, THEMES, ORIGINAL,
   yellowCandidates, hasFreeYellow, hasFreeBlue, findBlueCell,
-  BLUE_GRID, totalScore, greenNeeds, purpleNeeds,
+  BLUE_GRID, totalScore,
 } from '@fox/engine';
 import type { AreaColor, DieColor, Dice, Player } from '@fox/engine';
 import { useRoom } from './useRoom.js';
@@ -464,14 +464,9 @@ function Status({ state, me, isActive, theme }: any) {
     : !me.pickedThisTurn ? theme.terms.platter + '에서 하나를 고르세요'
     : !me.ready ? theme.terms.plusOne + ' 를 쓰거나 턴을 끝내세요'
     : '다른 사람을 기다리는 중';
-  const need = [greenNeeds(me.sheet), purpleNeeds(me.sheet)];
   return (
     <div className="status">
       <div className="msg">{msg}</div>
-      <div className="hints">
-        {need[0] !== null && <span>{theme.areas.green.name} 다음 칸 ≥{need[0]}</span>}
-        {need[1] !== null && <span>{theme.areas.purple.name} 다음 칸 ≥{need[1]}</span>}
-      </div>
     </div>
   );
 }
