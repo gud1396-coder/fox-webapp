@@ -149,7 +149,63 @@ function Lobby(p: any) {
       </p>
       {p.error && <div className="err" onClick={p.clearError}>{p.error}</div>}
 
+      <ConnCheck />
       <AdminPanel themeId={p.themeId} setThemeId={p.setThemeId} />
+    </div>
+  );
+}
+
+/**
+ * 연결 진단 — 이 기기에서 서버에 닿는지 확인한다.
+ * 일부 기관 망이 workers.dev 를 통째로 막는 경우가 있어, 어느 기기가 되고
+ * 어느 기기가 안 되는지 가려내려고 만들었다.
+ */
+function ConnCheck() {
+  const [state, setState] = useState<'idle' | 'run' | 'ok' | 'fail'>('idle');
+  const [detail, setDetail] = useState('');
+
+  const server = (import.meta.env.VITE_SERVER_URL ?? '').trim();
+  if (!server) return null;
+  const httpBase = server.replace(/^ws/, 'http');
+
+  const run = async () => {
+    setState('run'); setDetail('');
+    const t0 = Date.now();
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 8000);
+    try {
+      const r = await fetch(httpBase + '/health', { cache: 'no-store', signal: ctl.signal });
+      const body = (await r.text()).trim();
+      if (r.ok && body === 'ok') {
+        setState('ok');
+        setDetail(`${Date.now() - t0}ms 만에 응답했습니다.`);
+      } else {
+        setState('fail');
+        setDetail(`서버가 ${r.status} 를 돌려줬습니다.`);
+      }
+    } catch {
+      setState('fail');
+      setDetail('응답이 없습니다 — 이 기기의 네트워크가 서버 주소를 막고 있을 가능성이 큽니다.');
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  return (
+    <div className="conncheck">
+      <button onClick={run} disabled={state === 'run'}>
+        {state === 'run' ? '확인 중…' : '연결 진단'}
+      </button>
+      {state === 'ok' && <p className="cc-ok">연결됨 — 이 기기는 온라인 플레이가 됩니다. {detail}</p>}
+      {state === 'fail' && (
+        <p className="cc-fail">
+          연결 안 됨. {detail}
+          <br />
+          <span className="cc-hint">
+            휴대폰 데이터(와이파이 끄고)로 다시 눌러 보세요. 그때 되면 학교 망 차단입니다.
+          </span>
+        </p>
+      )}
     </div>
   );
 }

@@ -678,3 +678,11 @@ button.linkish {
 /* 관리자: 차단 상태 표시 */
 .lock-on { color: #ff9b9b; }
 .lock-off { color: #7ee3a6; }
+
+/* ---- 연결 진단 ---- */
+.conncheck { margin-top: 20px; }
+.conncheck button { width: 100%; }
+.conncheck p { margin: 8px 0 0; font-size: 13px; line-height: 1.55; padding: 9px 11px; border-radius: 8px; }
+.cc-ok { background: #16301f; color: #9ce8b8; }
+.cc-fail { background: #341c20; color: #ffb4b4; }
+.cc-hint { color: var(--dim); font-size: 12px; }
