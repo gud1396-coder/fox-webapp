@@ -5,6 +5,9 @@ import type { Action, GameState } from '@fox/engine';
 const SERVER = (import.meta.env.VITE_SERVER_URL ?? '').trim();
 
 export type Mode = 'local' | 'online';
+
+/** 이 빌드에 서버 주소가 들어 있는가. 참가 여부와 무관하게 판정한다. */
+export const HAS_SERVER = SERVER.length > 0;
 export type Status = 'local' | 'connecting' | 'open' | 'closed';
 
 export interface Room {

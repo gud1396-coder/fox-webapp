@@ -5,7 +5,7 @@ import {
   BLUE_GRID, totalScore, canUseDie,
 } from '@fox/engine';
 import type { AreaColor, DieColor, Dice, Player } from '@fox/engine';
-import { useRoom } from './useRoom.js';
+import { useRoom, HAS_SERVER } from './useRoom.js';
 import { Sheet, RoundTrack } from './Sheet.jsx';
 
 const DIE_KO: Record<DieColor, string> = {
@@ -55,6 +55,7 @@ export default function App() {
         name={name} setName={setName} code={code} setCode={setCode}
         themeId={themeId} setThemeId={setThemeId} theme={theme}
         mode={mode}
+        hasServer={HAS_SERVER}
         players={state.players}
         playerId={playerId}
         joined={joined}
@@ -101,14 +102,14 @@ function Lobby(p: any) {
 
       <label>방 코드
         <input value={p.code} onChange={(e) => p.setCode(e.target.value.toUpperCase())}
-          placeholder={p.mode === 'online' ? '예: SCIENCE1' : '로컬 모드 (한 대로 진행)'} maxLength={16} />
+          placeholder={p.hasServer ? '예: SCIENCE1' : '로컬 모드 (한 대로 진행)'} maxLength={16} />
       </label>
 
       {!p.joined ? (
         <button className="primary" disabled={!p.name.trim()} onClick={p.onJoin}>참가</button>
       ) : (
         <>
-          {p.mode === 'online' && p.code && <ShareBox code={p.code} />}
+          {p.hasServer && p.code && <ShareBox code={p.code} />}
 
           <div className="players-head">
             <span>참가자 {p.players.length}명</span>
@@ -123,7 +124,7 @@ function Lobby(p: any) {
             ))}
           </ul>
 
-          {p.mode === 'online' && p.players.length < 2 ? (
+          {p.hasServer && p.players.length < 2 ? (
             <>
               <button className="primary" disabled>
                 <span className="dots" aria-hidden="true"><i /><i /><i /></span>
@@ -143,9 +144,9 @@ function Lobby(p: any) {
       )}
 
       <p className="note">
-        {p.mode === 'online'
-          ? '온라인 모드 — 같은 방 코드를 입력하면 함께 플레이합니다.'
-          : '로컬 모드 — 이 브라우저에서만 진행됩니다. 온라인으로 하려면 VITE_SERVER_URL 을 설정하세요.'}
+        {p.hasServer
+          ? '온라인 모드 — 같은 방 코드를 입력하면 다른 기기와 함께 플레이합니다.'
+          : '로컬 모드 — 이 브라우저에서만 진행됩니다. 한 기기를 돌려가며 쓰세요.'}
       </p>
       {p.error && <div className="err" onClick={p.clearError}>{p.error}</div>}
 
