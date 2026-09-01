@@ -515,6 +515,7 @@ button.leave:hover:not(:disabled) { background: #4a2830; }
 .sidebar .b-round .box.plain u { display: none; }
 .sidebar .b-round .box .bicon { min-width: 15px; height: 15px; font-size: 10px; padding: 0 2px; }
 
-/* 1. 턴 표시칸이 컨트롤바 가로폭을 채우도록 */
-.sidebar .b-round .box { flex: 1 1 auto; min-width: 0; }
-.sidebar .b-round .box.plain { flex: 0 0 24px; }
+/* 1. 턴 표시칸이 컨트롤바 가로폭을 채우도록.
+   보너스가 없는 5·6 은 조금만 좁게 (0.7 배) 해서 비율을 맞춘다. */
+.sidebar .b-round .box { flex: 1 1 0; min-width: 0; }
+.sidebar .b-round .box.plain { flex: 0.7 1 0; }
