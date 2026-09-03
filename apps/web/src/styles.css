@@ -679,6 +679,17 @@ button.linkish {
 .lock-on { color: #ff9b9b; }
 .lock-off { color: #7ee3a6; }
 
+/* ---- 연결 상태 배너 ---- */
+.connbanner {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  margin: 4px 0 14px; padding: 9px 11px; border-radius: 8px;
+  font-size: 13px; line-height: 1.55;
+}
+.connbanner.wait { background: #1e2532; color: var(--dim); }
+.connbanner.bad { background: #341c20; color: #ffb4b4; }
+.connbanner strong { font-weight: 600; }
+.connbanner .linkish { font-size: 13px; }
+
 /* ---- 연결 진단 ---- */
 .conncheck { margin-top: 20px; }
 .conncheck button { width: 100%; }

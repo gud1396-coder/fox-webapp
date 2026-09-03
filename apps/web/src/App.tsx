@@ -6,6 +6,7 @@ import {
 } from '@fox/engine';
 import type { AreaColor, DieColor, Dice, Player } from '@fox/engine';
 import { useRoom, HAS_SERVER } from './useRoom.js';
+import type { Status } from './useRoom.js';
 import { Sheet, RoundTrack } from './Sheet.jsx';
 
 const DIE_KO: Record<DieColor, string> = {
@@ -20,12 +21,33 @@ function useLocal(key: string, init: string): [string, (v: string) => void] {
 
 const roomFromHash = () => (location.hash.replace(/^#\/?/, '').toUpperCase() || '');
 
+/** 참가 중인 방. 새로고침 뒤 자동 복귀에 쓴다. 나가면 지운다. */
+const ROOM_KEY = 'fox.room';
+const savedRoom = () => (localStorage.getItem(ROOM_KEY) ?? '').toUpperCase();
+
+/** 값이 ms 동안 잠잠해질 때까지 기다린다. 타이핑 중 방마다 붙지 않으려고. */
+function useSettled<T>(value: T, ms: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return settled;
+}
+
 export default function App() {
   const [playerId] = useLocal('fox.pid', Math.random().toString(36).slice(2, 10));
   const [name, setName] = useLocal('fox.name', '');
   const [themeId, setThemeId] = useLocal('fox.theme', 'earth-system');
-  const [code, setCode] = useState(roomFromHash);
-  const [joined, setJoined] = useState(false);
+  const [code, setCode] = useState(() => roomFromHash() || savedRoom());
+  // 새로고침 자동 복귀 — 참가 중이던 방이 있고 이름도 있으면 버튼 없이 돌아간다.
+  // 링크로 **다른** 방에 온 경우는 자동 복귀하지 않고 로비에서 확인받는다.
+  const [joined, setJoined] = useState(() => {
+    const room = savedRoom();
+    const fromLink = roomFromHash();
+    if (!room || !(localStorage.getItem('fox.name') ?? '').trim()) return false;
+    return !fromLink || fromLink === room;
+  });
 
   const theme = THEMES[themeId] ?? ORIGINAL;
 
@@ -37,7 +59,13 @@ export default function App() {
     () => (joined ? ({ t: 'join', playerId, name: trimmedName } as const) : null),
     [joined, playerId, trimmedName],
   );
-  const { state, send, error, clearError, mode, status } = useRoom(joined ? code : '', hello);
+
+  // 참가 전에도 방에 붙는다. 그래야 로비에서 대기자와 연결 상태가 실시간으로
+  // 보이고, 방을 잘못 짚었는지 학생이 바로 안다. 타이핑 중에는 잠잠해질 때까지
+  // 기다렸다 붙는다(참가한 뒤에는 지연 없이 바로).
+  const typingCode = useSettled(code, 600);
+  const liveCode = joined ? code : typingCode;
+  const { state, send, error, clearError, mode, status, reconnect } = useRoom(liveCode, hello);
 
   useEffect(() => {
     const h = () => setCode(roomFromHash());
@@ -58,6 +86,10 @@ export default function App() {
         players={state.players}
         playerId={playerId}
         joined={joined}
+        status={status}
+        reconnect={reconnect}
+        connected={!!me}
+        live={liveCode === code && code.trim().length > 0}
         onJoin={() => {
           const room = code.trim().toUpperCase();
           // 서버가 있는 빌드에서는 방 코드가 반드시 있어야 한다. 코드 없이
@@ -67,6 +99,7 @@ export default function App() {
           // hashchange 를 기다리지 않고 코드를 먼저 확정한다. 기다리면 그 사이
           // 렌더가 코드 없는(=로컬) 상태로 돌아 참가가 서버로 가지 않는다.
           setCode(target);
+          localStorage.setItem(ROOM_KEY, target);
           location.hash = '/' + target;
           setJoined(true);
         }}
@@ -79,9 +112,10 @@ export default function App() {
   const leaveRoom = () => {
     send({ t: 'leave', playerId });
     setJoined(false);
-    // 방 코드와 주소는 그대로 둔다. 지우면 학생이 곧바로 참가를 다시 눌렀을 때
-    // 빈 코드로 엉뚱한 방에 들어가고, 새로고침해도 코드를 되찾지 못한다.
-    // 다른 방으로 가려면 코드 칸을 고쳐 쓰면 된다.
+    // 나간 것은 학생의 뜻이므로 자동 복귀 대상에서 뺀다. 다만 방 코드와 주소는
+    // 그대로 둔다 — 지우면 곧바로 참가를 다시 눌렀을 때 엉뚱한 방으로 가고,
+    // 새로고침해도 코드를 되찾지 못한다. 다른 방은 코드 칸을 고쳐 쓰면 된다.
+    localStorage.removeItem(ROOM_KEY);
   };
 
   return (
@@ -110,6 +144,13 @@ function Lobby(p: any) {
           placeholder={p.hasServer ? '예: SCIENCE1' : '로컬 모드 (한 대로 진행)'} maxLength={16} />
       </label>
 
+      {p.hasServer && (p.joined || p.live) && (
+        <ConnBanner
+          status={p.status} connected={p.connected} joined={p.joined}
+          code={p.code} onRetry={p.reconnect}
+        />
+      )}
+
       {!p.joined ? (
         <>
           <button
@@ -121,6 +162,14 @@ function Lobby(p: any) {
           </button>
           {p.hasServer && p.name.trim() && !p.code.trim() && (
             <p className="note sub-note">선생님이 알려준 방 코드를 입력해야 참가할 수 있습니다.</p>
+          )}
+          {/* 붙어만 보고 아직 참가하지 않은 상태 — 방을 제대로 짚었는지 알려준다. */}
+          {p.hasServer && p.live && p.status === 'open' && (
+            <p className="note sub-note">
+              {p.players.length > 0
+                ? `방 ${p.code} 에 이미 ${p.players.length}명이 있습니다.`
+                : `방 ${p.code} 은(는) 아직 비어 있습니다. 코드가 맞는지 확인하세요.`}
+            </p>
           )}
         </>
       ) : (
@@ -140,7 +189,14 @@ function Lobby(p: any) {
             ))}
           </ul>
 
-          {p.hasServer && p.players.length < 2 ? (
+          {/* 아직 서버 방에 못 들어갔으면 "기다리는 중" 이 아니라 그 사실을 말한다.
+              예전에는 미접속·빈 방·정말 대기 중이 전부 같은 화면이었다. */}
+          {p.hasServer && !p.connected ? (
+            <button className="primary" disabled>
+              <span className="dots" aria-hidden="true"><i /><i /><i /></span>
+              방에 들어가는 중
+            </button>
+          ) : p.hasServer && p.players.length < 2 ? (
             <>
               <button className="primary" disabled>
                 <span className="dots" aria-hidden="true"><i /><i /><i /></span>
@@ -160,14 +216,46 @@ function Lobby(p: any) {
       )}
 
       <p className="note">
-        {p.hasServer
-          ? '온라인 모드 — 같은 방 코드를 입력하면 다른 기기와 함께 플레이합니다.'
-          : '로컬 모드 — 이 브라우저에서만 진행됩니다. 한 기기를 돌려가며 쓰세요.'}
+        {!p.hasServer
+          ? '로컬 모드 — 이 브라우저에서만 진행됩니다. 한 기기를 돌려가며 쓰세요.'
+          : p.status === 'closed'
+            ? '서버에 연결되어 있지 않습니다. 아래 연결 진단을 눌러 확인해 보세요.'
+            : p.status === 'open'
+              ? '온라인 모드 — 서버에 연결되어 있습니다.'
+              : '온라인 모드 — 같은 방 코드를 입력하면 다른 기기와 함께 플레이합니다.'}
       </p>
       {p.error && <div className="err" onClick={p.clearError}>{p.error}</div>}
 
       <ConnCheck />
       <AdminPanel themeId={p.themeId} setThemeId={p.setThemeId} />
+    </div>
+  );
+}
+
+/**
+ * 연결 상태 배너 — 로비에서 지금 무슨 일이 벌어지는지 한 줄로 말한다.
+ * 예전에는 소켓 미개통 · 서버 방 미합류 · 정말 대기 중이 전부 똑같이
+ * "다른 사람을 기다리는 중" 으로 보여서, 학생도 교사도 구분할 수 없었다.
+ */
+function ConnBanner(
+  { status, connected, joined, code, onRetry }:
+  { status: Status; connected: boolean; joined: boolean; code: string; onRetry: () => void },
+) {
+  // 참가까지 끝났고 연결도 멀쩡하면 굳이 아무 말 하지 않는다.
+  if (status === 'open' && (connected || !joined)) return null;
+
+  if (status === 'closed') {
+    return (
+      <div className="connbanner bad">
+        <strong>서버와 연결이 끊겼습니다.</strong> 자동으로 다시 시도하고 있습니다.
+        {' '}<button className="linkish" onClick={onRetry}>지금 다시 연결</button>
+      </div>
+    );
+  }
+  return (
+    <div className="connbanner wait">
+      <span className="dots" aria-hidden="true"><i /><i /><i /></span>
+      {status === 'connecting' ? '서버에 연결하는 중…' : `방 ${code} 에 들어가는 중…`}
     </div>
   );
 }

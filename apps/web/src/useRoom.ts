@@ -17,6 +17,8 @@ export interface Room {
   clearError: () => void;
   mode: Mode;
   status: Status;
+  /** 백오프를 기다리지 않고 지금 다시 붙는다. 로비의 "다시 연결" 버튼용. */
+  reconnect: () => void;
 }
 
 /**
@@ -40,6 +42,11 @@ export function useRoom(code: string, hello?: Action | null): Room {
   // onopen 은 이 이펙트보다 늦게 돌므로 최신 값을 ref 로 읽는다.
   const helloRef = useRef<Action | null>(hello ?? null);
   helloRef.current = hello ?? null;
+  // 어떤 소켓에 어떤 hello 를 보냈는지. 같은 소켓에 두 번 보내지 않기 위한 표시.
+  const helloOn = useRef<{ sock: WebSocket; action: Action } | null>(null);
+  // 재접속 대기 타이머와 현재 connect 함수 — reconnect() 가 쓴다.
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!online) return;
@@ -55,7 +62,9 @@ export function useRoom(code: string, hello?: Action | null): Room {
         retry.current = 0;
         setStatus('open');
         // 참가를 먼저 보낸다. 재접속일 때도 다시 보내야 서버 방에 남는다.
-        const queued = helloRef.current ? [helloRef.current, ...pending.current] : pending.current;
+        const h = helloRef.current;
+        if (h) helloOn.current = { sock, action: h };
+        const queued = h ? [h, ...pending.current] : pending.current;
         pending.current = [];
         for (const action of queued) sock.send(JSON.stringify({ t: 'action', action }));
       };
@@ -69,14 +78,18 @@ export function useRoom(code: string, hello?: Action | null): Room {
         setStatus('closed');
         // 지수 백오프 재접속
         const wait = Math.min(1000 * 2 ** retry.current++, 15000);
-        setTimeout(connect, wait);
+        timer.current = setTimeout(connect, wait);
       };
       sock.onerror = () => sock.close();
     };
 
+    connectRef.current = connect;
     connect();
     return () => {
       alive.current = false;
+      if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+      connectRef.current = () => {};
+      helloOn.current = null;
       ws.current?.close();
     };
   }, [online, code]);
@@ -106,6 +119,17 @@ export function useRoom(code: string, hello?: Action | null): Room {
     [online],
   );
 
+  // 로비에서 미리 붙어 있다가 참가를 누른 경우. 소켓이 이미 열려 있으니
+  // onopen 이 다시 돌지 않는다 — 여기서 보낸다.
+  useEffect(() => {
+    if (!online || !hello) return;
+    const sock = ws.current;
+    if (!sock || sock.readyState !== WebSocket.OPEN) return;
+    if (helloOn.current?.sock === sock && helloOn.current.action === hello) return;
+    helloOn.current = { sock, action: hello };
+    sock.send(JSON.stringify({ t: 'action', action: hello }));
+  }, [online, hello, status]);
+
   // 로컬 모드에는 소켓이 없다. hello 를 엔진에 직접 한 번 적용한다.
   // (hello 는 호출부에서 memo 로 고정한다 — 렌더마다 새 객체면 계속 다시 보낸다.)
   const helloApplied = useRef<Action | null>(null);
@@ -117,7 +141,16 @@ export function useRoom(code: string, hello?: Action | null): Room {
     send(hello);
   }, [online, hello, send]);
 
+  const reconnect = useCallback(() => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    retry.current = 0;
+    const sock = ws.current;
+    // 열려 있거나 여는 중이면 닫는다. onclose 가 백오프 0 으로 곧장 다시 연다.
+    if (sock && sock.readyState !== WebSocket.CLOSED) { sock.close(); return; }
+    connectRef.current();
+  }, []);
+
   const clearError = useCallback(() => setError(null), []);
 
-  return { state, send, error, clearError, mode: online ? 'online' : 'local', status };
+  return { state, send, error, clearError, mode: online ? 'online' : 'local', status, reconnect };
 }
