@@ -28,23 +28,22 @@ export default function App() {
   const [joined, setJoined] = useState(false);
 
   const theme = THEMES[themeId] ?? ORIGINAL;
-  const { state, send, error, clearError, mode, status } = useRoom(joined ? code : '');
+
+  // 참가 액션은 useRoom 이 들고 있다가 소켓이 열릴 때마다 보낸다. 예전처럼
+  // 여기서 한 번만 보내면, 참가가 로컬 엔진으로 새는 경우와 재접속한 경우에
+  // 서버 방에 못 들어간 채 "다른 사람을 기다리는 중" 에 갇힌다.
+  const trimmedName = name.trim();
+  const hello = useMemo(
+    () => (joined ? ({ t: 'join', playerId, name: trimmedName } as const) : null),
+    [joined, playerId, trimmedName],
+  );
+  const { state, send, error, clearError, mode, status } = useRoom(joined ? code : '', hello);
 
   useEffect(() => {
     const h = () => setCode(roomFromHash());
     addEventListener('hashchange', h);
     return () => removeEventListener('hashchange', h);
   }, []);
-
-  // 참가는 joined 가 true 가 된 다음 렌더에서 보낸다. 클릭 시점의 send 는
-  // 아직 로컬 모드용이라 서버로 가지 않는다. 소켓이 아직 안 열렸으면
-  // useRoom 이 큐에 담아 두었다가 열릴 때 보낸다.
-  const joinSent = useRef(false);
-  useEffect(() => {
-    if (!joined || joinSent.current) return;
-    joinSent.current = true;
-    send({ t: 'join', playerId, name: name.trim() });
-  }, [joined, send, playerId, name]);
 
   const me = state.players.find((p) => p.id === playerId) ?? null;
 
@@ -60,8 +59,15 @@ export default function App() {
         playerId={playerId}
         joined={joined}
         onJoin={() => {
-          if (!name.trim()) return;
-          location.hash = '/' + (code || 'LOCAL');
+          const room = code.trim().toUpperCase();
+          // 서버가 있는 빌드에서는 방 코드가 반드시 있어야 한다. 코드 없이
+          // 들여보내면 서버 방에 합류하지 못한 채 혼자 갇힌다.
+          if (!name.trim() || (HAS_SERVER && !room)) return;
+          const target = room || 'LOCAL';
+          // hashchange 를 기다리지 않고 코드를 먼저 확정한다. 기다리면 그 사이
+          // 렌더가 코드 없는(=로컬) 상태로 돌아 참가가 서버로 가지 않는다.
+          setCode(target);
+          location.hash = '/' + target;
           setJoined(true);
         }}
         onStart={() => send({ t: 'start', playerId })}
@@ -72,11 +78,10 @@ export default function App() {
 
   const leaveRoom = () => {
     send({ t: 'leave', playerId });
-    joinSent.current = false;
     setJoined(false);
-    setCode('');
-    // hash = '' 는 '#' 가 남고 hashchange 도 안 뜬다. 주소만 조용히 정리한다.
-    history.replaceState(null, '', location.pathname + location.search);
+    // 방 코드와 주소는 그대로 둔다. 지우면 학생이 곧바로 참가를 다시 눌렀을 때
+    // 빈 코드로 엉뚱한 방에 들어가고, 새로고침해도 코드를 되찾지 못한다.
+    // 다른 방으로 가려면 코드 칸을 고쳐 쓰면 된다.
   };
 
   return (
@@ -106,7 +111,18 @@ function Lobby(p: any) {
       </label>
 
       {!p.joined ? (
-        <button className="primary" disabled={!p.name.trim()} onClick={p.onJoin}>참가</button>
+        <>
+          <button
+            className="primary"
+            disabled={!p.name.trim() || (p.hasServer && !p.code.trim())}
+            onClick={p.onJoin}
+          >
+            참가
+          </button>
+          {p.hasServer && p.name.trim() && !p.code.trim() && (
+            <p className="note sub-note">선생님이 알려준 방 코드를 입력해야 참가할 수 있습니다.</p>
+          )}
+        </>
       ) : (
         <>
           {p.hasServer && p.code && <ShareBox code={p.code} />}

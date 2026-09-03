@@ -22,8 +22,12 @@ export interface Room {
 /**
  * 서버 URL 이 설정되어 있으면 Durable Object 방에 붙고,
  * 없으면 브라우저 안에서 엔진을 그대로 돌린다(로컬 모드, 한 대로 돌려보기).
+ *
+ * `hello` 는 소켓이 열릴 때마다 **매번** 먼저 보내는 액션이다(참가). 한 번만
+ * 보내면 재접속·방 초기화 뒤에 서버 방에서 빠진 채로 남는다. 리듀서의 `join`
+ * 은 멱등이라 여러 번 보내도 안전하다.
  */
-export function useRoom(code: string): Room {
+export function useRoom(code: string, hello?: Action | null): Room {
   const online = SERVER.length > 0 && code.length > 0;
   const [state, setState] = useState<GameState>(createGame);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +37,9 @@ export function useRoom(code: string): Room {
   const alive = useRef(true);
   // 소켓이 열리기 전에 보낸 액션을 담아두었다가 onopen 에서 흘려보낸다.
   const pending = useRef<Action[]>([]);
+  // onopen 은 이 이펙트보다 늦게 돌므로 최신 값을 ref 로 읽는다.
+  const helloRef = useRef<Action | null>(hello ?? null);
+  helloRef.current = hello ?? null;
 
   useEffect(() => {
     if (!online) return;
@@ -47,7 +54,8 @@ export function useRoom(code: string): Room {
       sock.onopen = () => {
         retry.current = 0;
         setStatus('open');
-        const queued = pending.current;
+        // 참가를 먼저 보낸다. 재접속일 때도 다시 보내야 서버 방에 남는다.
+        const queued = helloRef.current ? [helloRef.current, ...pending.current] : pending.current;
         pending.current = [];
         for (const action of queued) sock.send(JSON.stringify({ t: 'action', action }));
       };
@@ -97,6 +105,17 @@ export function useRoom(code: string): Room {
     },
     [online],
   );
+
+  // 로컬 모드에는 소켓이 없다. hello 를 엔진에 직접 한 번 적용한다.
+  // (hello 는 호출부에서 memo 로 고정한다 — 렌더마다 새 객체면 계속 다시 보낸다.)
+  const helloApplied = useRef<Action | null>(null);
+  useEffect(() => {
+    if (online) return;
+    if (!hello) { helloApplied.current = null; return; }
+    if (helloApplied.current === hello) return;
+    helloApplied.current = hello;
+    send(hello);
+  }, [online, hello, send]);
 
   const clearError = useCallback(() => setError(null), []);
 
