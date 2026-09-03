@@ -182,9 +182,10 @@ function Lobby(p: any) {
           </div>
           <ul className="players">
             {p.players.map((x: Player) => (
-              <li key={x.id}>
+              <li key={x.id} className={x.connected ? '' : 'gone'}>
                 {x.name}
                 {x.id === p.playerId && <em> (나)</em>}
+                {!x.connected && <em> · 연결 끊김</em>}
               </li>
             ))}
           </ul>
@@ -603,6 +604,25 @@ function Game({ state, me, playerId, theme, send, error, clearError, mode, statu
       </header>
 
       {error && <div className="err" onClick={clearError}>{error} (눌러서 닫기)</div>}
+
+      {/* 끊긴 사람이 있으면 진행이 멈춘다 — 누구나 풀 수 있게 해둔다. */}
+      {s.phase !== 'gameOver' && (() => {
+        const gone = state.players.filter((p: Player) => !p.connected);
+        if (gone.length === 0) return null;
+        const activeGone = !state.players[s.activeIdx]?.connected;
+        return (
+          <div className="dropped">
+            <strong>{gone.map((p: Player) => p.name).join(', ')}</strong> 님의 연결이 끊겼습니다.
+            {activeGone && ' 지금 차례라 진행이 멈춰 있습니다.'}
+            {' '}돌아오기를 기다리거나,
+            {' '}<button className="linkish" onClick={() => send({ t: 'skipDisconnected', playerId })}>
+              건너뛰고 진행
+            </button>
+            {' '}할 수 있습니다.
+            <span className="drop-hint">건너뛴 사람은 이번 차례의 보너스를 받지 못합니다.</span>
+          </div>
+        );
+      })()}
 
       {s.phase === 'gameOver' ? (
         <GameOver state={state} theme={theme} />

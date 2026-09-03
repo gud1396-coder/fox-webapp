@@ -4,6 +4,10 @@ import type { Action, GameState } from '@fox/engine';
 
 const SERVER = (import.meta.env.VITE_SERVER_URL ?? '').trim();
 
+/** 하트비트 주기와 pong 대기 시간. */
+const BEAT_MS = 25000;
+const PONG_WAIT = 10000;
+
 export type Mode = 'local' | 'online';
 
 /** 이 빌드에 서버 주소가 들어 있는가. 참가 여부와 무관하게 판정한다. */
@@ -36,7 +40,6 @@ export function useRoom(code: string, hello?: Action | null): Room {
   const [status, setStatus] = useState<Status>(online ? 'connecting' : 'local');
   const ws = useRef<WebSocket | null>(null);
   const retry = useRef(0);
-  const alive = useRef(true);
   // 소켓이 열리기 전에 보낸 액션을 담아두었다가 onopen 에서 흘려보낸다.
   const pending = useRef<Action[]>([]);
   // onopen 은 이 이펙트보다 늦게 돌므로 최신 값을 ref 로 읽는다.
@@ -50,15 +53,32 @@ export function useRoom(code: string, hello?: Action | null): Room {
 
   useEffect(() => {
     if (!online) return;
-    alive.current = true;
+    // 이 이펙트 인스턴스 전용 상태. 공유 ref 를 쓰면, 아직 CONNECTING 인 소켓을
+    // 정리하면서 닫았을 때 그 소켓의 뒤늦은 onclose 가 "아직 살아 있다" 고 보고
+    // 재접속을 하나 더 만든다. 그렇게 버려진 소켓이 열린 채 남으면 하트비트가
+    // 두 벌 돌고, 서버는 그 사람이 아직 붙어 있다고 여겨 끊김을 감지하지 못한다.
+    let stopped = false;
+    let current: WebSocket | null = null;
 
     const connect = () => {
-      if (!alive.current) return;
+      if (stopped) return;
       setStatus('connecting');
       const sock = new WebSocket(`${SERVER}/room/${encodeURIComponent(code)}`);
+      current = sock;
       ws.current = sock;
 
+      // 하트비트. 모바일·절전 망에서는 소켓이 조용히 죽고 onclose 가 뜨지 않아
+      // 재접속이 걸리지 않는다. ping 을 보내고 pong 이 안 오면 직접 끊는다.
+      let beat: ReturnType<typeof setInterval> | null = null;
+      let watchdog: ReturnType<typeof setTimeout> | null = null;
+      const stopBeat = () => {
+        if (beat) { clearInterval(beat); beat = null; }
+        if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+      };
+
       sock.onopen = () => {
+        // 이미 버려진 시도라면 붙자마자 닫는다. 남겨두면 유령 소켓이 된다.
+        if (stopped || sock !== current) { sock.close(); return; }
         retry.current = 0;
         setStatus('open');
         // 참가를 먼저 보낸다. 재접속일 때도 다시 보내야 서버 방에 남는다.
@@ -67,14 +87,28 @@ export function useRoom(code: string, hello?: Action | null): Room {
         const queued = h ? [h, ...pending.current] : pending.current;
         pending.current = [];
         for (const action of queued) sock.send(JSON.stringify({ t: 'action', action }));
+
+        beat = setInterval(() => {
+          if (sock.readyState !== WebSocket.OPEN) return;
+          sock.send(JSON.stringify({ t: 'ping' }));
+          if (watchdog) return; // 이미 답을 기다리는 중
+          watchdog = setTimeout(() => { watchdog = null; sock.close(); }, PONG_WAIT);
+        }, BEAT_MS);
       };
       sock.onmessage = (ev) => {
+        if (sock !== current) return;
         const msg = JSON.parse(ev.data as string);
+        if (msg.t === 'pong') {
+          if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+          return;
+        }
         if (msg.t === 'state') setState(msg.state as GameState);
         else if (msg.t === 'error') setError(msg.message as string);
       };
       sock.onclose = () => {
-        if (!alive.current) return;
+        stopBeat();
+        // 버려진 소켓의 뒤늦은 onclose 로 재접속을 만들지 않는다.
+        if (stopped || sock !== current) return;
         setStatus('closed');
         // 지수 백오프 재접속
         const wait = Math.min(1000 * 2 ** retry.current++, 15000);
@@ -86,11 +120,12 @@ export function useRoom(code: string, hello?: Action | null): Room {
     connectRef.current = connect;
     connect();
     return () => {
-      alive.current = false;
+      stopped = true;
       if (timer.current) { clearTimeout(timer.current); timer.current = null; }
       connectRef.current = () => {};
       helloOn.current = null;
-      ws.current?.close();
+      current?.close();
+      current = null;
     };
   }, [online, code]);
 
@@ -149,6 +184,24 @@ export function useRoom(code: string, hello?: Action | null): Room {
     if (sock && sock.readyState !== WebSocket.CLOSED) { sock.close(); return; }
     connectRef.current();
   }, []);
+
+  // 화면이 다시 보이거나 네트워크가 돌아오면 백오프를 기다리지 않고 바로 붙는다.
+  // 학생이 화면을 껐다 켜거나 와이파이가 잠깐 끊긴 경우가 대부분이다.
+  useEffect(() => {
+    if (!online) return;
+    const wake = () => {
+      if (document.visibilityState === 'hidden') return;
+      const sock = ws.current;
+      if (sock && sock.readyState === WebSocket.OPEN) return;
+      reconnect();
+    };
+    addEventListener('visibilitychange', wake);
+    addEventListener('online', wake);
+    return () => {
+      removeEventListener('visibilitychange', wake);
+      removeEventListener('online', wake);
+    };
+  }, [online, reconnect]);
 
   const clearError = useCallback(() => setError(null), []);
 

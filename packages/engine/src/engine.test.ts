@@ -377,3 +377,56 @@ test('액티브가 아니면 눈을 다시 입력할 수 없다', () => {
   s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(6) });
   assert.throws(() => reduce(s, { t: 'redoDice', playerId: 'b' }), RuleError);
 });
+
+// ---------- 접속 끊김 ----------
+
+test('끊긴 액티브가 진행을 막고, 건너뛰기로 풀린다', () => {
+  let s = started();
+  assert.equal(s.players[s.activeIdx].id, 'a', '가가 액티브');
+  assert.equal(s.phase, 'enterDice');
+
+  // 가가 끊겼다. 액티브만 눈을 입력할 수 있으니 아무도 진행할 수 없다.
+  s = reduce(s, { t: 'setConnected', playerId: 'a', connected: false });
+  assert.throws(() => reduce(s, { t: 'setDice', playerId: 'b', dice: allDice(3) }), RuleError);
+
+  // 남은 사람이 건너뛰면 다음 사람 차례로 넘어간다.
+  s = reduce(s, { t: 'skipDisconnected', playerId: 'b' });
+  assert.equal(s.players[s.activeIdx].id, 'b', '나에게 차례가 넘어간다');
+  assert.equal(s.phase, 'enterDice');
+  assert.equal(s.platter.length, 0, '건너뛴 차례는 은쟁반을 만들지 않는다');
+});
+
+test('끊긴 패시브가 턴 종료를 막고, 건너뛰기로 풀린다', () => {
+  let s = started();
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(4) });
+  s = reduce(s, { t: 'pick', playerId: 'a', die: 'green', as: 'green' });
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(4) });
+  s = reduce(s, { t: 'pick', playerId: 'a', die: 'orange', as: 'orange' });
+  s = reduce(s, { t: 'setDice', playerId: 'a', dice: allDice(4) });
+  s = reduce(s, { t: 'pick', playerId: 'a', die: 'purple', as: 'purple' });
+  assert.equal(s.phase, 'passive', '패시브 페이즈');
+
+  // 나가 끊겼다 — 배리어가 전원 ready 를 기다리므로 턴이 끝나지 않는다.
+  s = reduce(s, { t: 'setConnected', playerId: 'b', connected: false });
+  const before = s.activeIdx;
+  s = reduce(s, { t: 'ready', playerId: 'a' });
+  assert.equal(s.activeIdx, before, '나를 기다리느라 턴이 안 넘어간다');
+
+  s = reduce(s, { t: 'skipDisconnected', playerId: 'a' });
+  assert.notEqual(s.activeIdx, before, '건너뛰면 턴이 넘어간다');
+});
+
+test('끊긴 사람이 없으면 건너뛸 수 없다', () => {
+  const s = started();
+  assert.throws(() => reduce(s, { t: 'skipDisconnected', playerId: 'a' }), RuleError);
+});
+
+test('다시 접속하면 연결 표시가 돌아온다', () => {
+  let s = started();
+  s = reduce(s, { t: 'setConnected', playerId: 'a', connected: false });
+  assert.equal(s.players[0].connected, false);
+  // 재접속은 join 으로 들어온다 (클라이언트가 소켓마다 다시 보낸다)
+  s = reduce(s, { t: 'join', playerId: 'a', name: '가' });
+  assert.equal(s.players[0].connected, true);
+  assert.equal(s.players.length, 2, '중복 참가가 되지 않는다');
+});

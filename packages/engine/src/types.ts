@@ -135,6 +135,17 @@ export type Action =
   /** 보너스 체인 중 선택 응답 */
   | { t: 'choose'; playerId: string; answer: ChoiceAnswer }
   /** 이번 턴 종료 선언 */
-  | { t: 'ready'; playerId: string };
+  | { t: 'ready'; playerId: string }
+  /**
+   * 접속 상태 변경. **서버만 보낸다** — 소켓이 붙고 끊기는 것을 보고 서버가
+   * 넣는다. 클라이언트가 보낸 것은 서버에서 거부한다(남을 끊긴 것으로
+   * 만들 수 있으므로).
+   */
+  | { t: 'setConnected'; playerId: string; connected: boolean }
+  /**
+   * 끊긴 사람 때문에 멈춘 진행을 푼다. 연결된 사람 누구나 누를 수 있다.
+   * 끊긴 사람은 미처리 보너스를 포기하고 이번 턴을 마친 것으로 처리된다.
+   */
+  | { t: 'skipDisconnected'; playerId: string };
 
 export class RuleError extends Error {}

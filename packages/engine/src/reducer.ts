@@ -180,7 +180,19 @@ function advanceTurn(s: GameState): void {
 
 // ---------- 리듀서 ----------
 
+/**
+ * 로그 최대 길이. 상태는 액션마다 통째로 저장·방송되므로 무한정 늘리면
+ * 곤란하다. 접속이 불안정한 사람이 있으면 끊김/재접속 기록이 계속 쌓인다.
+ */
+const LOG_MAX = 200;
+
 export function reduce(state: GameState, action: Action): GameState {
+  const next = apply(state, action);
+  if (next.log.length > LOG_MAX) next.log = next.log.slice(-LOG_MAX);
+  return next;
+}
+
+function apply(state: GameState, action: Action): GameState {
   const s: GameState = structuredClone(state);
 
   switch (action.t) {
@@ -355,6 +367,40 @@ export function reduce(state: GameState, action: Action): GameState {
       need(p.pickedThisTurn, '먼저 기입을 마치세요');
       need(!blocked(p), '먼저 보너스를 처리하세요');
       p.ready = true;
+      afterPassive(s);
+      return s;
+    }
+
+    case 'setConnected': {
+      const p = s.players.find((x) => x.id === action.playerId);
+      if (!p || p.connected === action.connected) return s;
+      p.connected = action.connected;
+      s.log.push(p.name + (action.connected ? ' 다시 연결됨' : ' 연결 끊김'));
+      return s;
+    }
+
+    case 'skipDisconnected': {
+      // 끊긴 사람은 라운드 보너스 배리어와 패시브 배리어를 둘 다 막는다.
+      // (afterRoundBonus 는 전원 blocked 해소를, afterPassive 는 전원 ready 를
+      // 기다린다.) 그래서 한 명만 끊겨도 반 전체가 멈춘다 — 그 탈출구다.
+      need(s.phase !== 'lobby' && s.phase !== 'gameOver', '지금은 건너뛸 수 없습니다');
+      const gone = s.players.filter((p) => !p.connected);
+      need(gone.length > 0, '연결이 끊긴 사람이 없습니다');
+
+      // 미처리 보너스는 포기시킨다. 그래야 배리어가 풀린다.
+      for (const p of gone) { p.queue = []; p.awaiting = null; }
+
+      const active = s.players[s.activeIdx];
+      if (active && !active.connected && (s.phase === 'enterDice' || s.phase === 'active')) {
+        // 액티브가 끊겼다 — 이번 차례를 통째로 건너뛴다. 은쟁반도 만들지 않는다.
+        s.log.push(active.name + ' 연결 끊김 — 이번 차례를 건너뜁니다');
+        advanceTurn(s);
+        return s;
+      }
+
+      for (const p of gone) { p.pickedThisTurn = true; p.ready = true; }
+      s.log.push(gone.map((p) => p.name).join(', ') + ' 연결 끊김 — 건너뜁니다');
+      afterRoundBonus(s);
       afterPassive(s);
       return s;
     }

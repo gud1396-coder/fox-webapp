@@ -207,6 +207,17 @@ export class GameRoom implements DurableObject {
     if (msg.t === 'ping') return this.send(ws, { t: 'pong' });
     if (msg.t !== 'action') return;
 
+    // setConnected 는 서버가 소켓 상태를 보고 넣는 것이다. 클라이언트가 보내면
+    // 남을 마음대로 "끊긴 사람" 으로 만들어 턴을 건너뛸 수 있다.
+    if (msg.action.t === 'setConnected') {
+      return this.send(ws, { t: 'error', message: '허용되지 않는 요청입니다' });
+    }
+    // 이 소켓이 누구인지 기억해 둔다. 끊길 때 누가 나갔는지 알아야 한다.
+    // 하이버네이션에서 깨어나도 attachment 는 남는다.
+    if (msg.action.t === 'join') {
+      try { ws.serializeAttachment({ playerId: msg.action.playerId }); } catch { /* 무시 */ }
+    }
+
     const before = this.state ?? createGame();
     let next: GameState;
     try {
@@ -221,8 +232,38 @@ export class GameRoom implements DurableObject {
     this.broadcast({ t: 'state', state: next });
   }
 
-  async webSocketClose(): Promise<void> {
-    // 재접속을 허용하므로 상태에서 지우지 않는다.
+  async webSocketClose(ws: WebSocket): Promise<void> {
+    // 재접속을 허용하므로 상태에서 지우지 않는다. 다만 끊긴 것은 알려야 한다 —
+    // 예전에는 여기가 비어 있어서, 끊긴 사람이 액티브면 방 전체가 멈추고
+    // "모든 방 초기화" 말고는 손쓸 방법이 없었다.
+    let playerId: string | undefined;
+    try { playerId = (ws.deserializeAttachment() as { playerId?: string } | null)?.playerId; }
+    catch { /* attachment 없음 */ }
+    if (!playerId) return;
+
+    // 같은 사람이 다른 탭·기기로 아직 붙어 있으면 끊긴 것이 아니다.
+    for (const other of this.ctx.getWebSockets()) {
+      if (other === ws) continue;
+      try {
+        const a = other.deserializeAttachment() as { playerId?: string } | null;
+        if (a?.playerId === playerId) return;
+      } catch { /* 무시 */ }
+    }
+
+    await this.apply({ t: 'setConnected', playerId, connected: false });
+  }
+
+  /** 액션을 상태에 반영하고 저장·방송한다. 규칙 위반은 조용히 무시한다. */
+  private async apply(action: Action): Promise<void> {
+    let next: GameState;
+    try {
+      next = reduce(this.state ?? createGame(), action);
+    } catch {
+      return;
+    }
+    this.state = next;
+    await this.ctx.storage.put('state', next);
+    this.broadcast({ t: 'state', state: next });
   }
 
   private send(ws: WebSocket, msg: Outbound): void {

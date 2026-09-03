@@ -679,6 +679,16 @@ button.linkish {
 .lock-on { color: #ff9b9b; }
 .lock-off { color: #7ee3a6; }
 
+/* ---- 접속 끊긴 사람 안내 ---- */
+.dropped {
+  margin: 0 0 10px; padding: 9px 12px; border-radius: 8px;
+  background: #342a1c; color: #ffd9a0; font-size: 13px; line-height: 1.6;
+}
+.dropped strong { font-weight: 600; }
+.dropped .linkish { font-size: 13px; color: #ffc46b; }
+.dropped .drop-hint { display: block; color: var(--dim); font-size: 12px; margin-top: 2px; }
+.players li.gone { color: var(--dim); }
+
 /* ---- 연결 상태 배너 ---- */
 .connbanner {
   display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
