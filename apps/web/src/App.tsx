@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DIE_COLORS, THEMES, ORIGINAL,
   yellowCandidates, hasFreeYellow, hasFreeBlue, findBlueCell,
@@ -274,27 +274,45 @@ function ConnCheck() {
   if (!server) return null;
   const httpBase = server.replace(/^ws/, 'http');
 
+  /** 게임이 실제로 쓰는 것은 WebSocket 이다. 이것부터 본다. */
+  const tryWs = () => new Promise<boolean>((done) => {
+    let settled = false;
+    const fin = (v: boolean, w?: WebSocket) => {
+      if (settled) return; settled = true;
+      try { w?.close(); } catch { /* 무시 */ }
+      done(v);
+    };
+    try {
+      const w = new WebSocket(`${server}/room/PROBE`);
+      w.onopen = () => fin(true, w);
+      w.onerror = () => fin(false, w);
+      setTimeout(() => fin(false, w), 8000);
+    } catch { fin(false); }
+  });
+
+  const tryHealth = async () => {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 6000);
+    try {
+      const r = await fetch(httpBase + '/health', { cache: 'no-store', signal: ctl.signal });
+      return r.ok && (await r.text()).trim() === 'ok';
+    } catch { return false; } finally { clearTimeout(timer); }
+  };
+
   const run = async () => {
     setState('run'); setDetail('');
     const t0 = Date.now();
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 8000);
-    try {
-      const r = await fetch(httpBase + '/health', { cache: 'no-store', signal: ctl.signal });
-      const body = (await r.text()).trim();
-      if (r.ok && body === 'ok') {
-        setState('ok');
-        setDetail(`${Date.now() - t0}ms 만에 응답했습니다.`);
-      } else {
-        setState('fail');
-        setDetail(`서버가 ${r.status} 를 돌려줬습니다.`);
-      }
-    } catch {
-      setState('fail');
-      setDetail('응답이 없습니다 — 이 기기의 네트워크가 서버 주소를 막고 있을 가능성이 큽니다.');
-    } finally {
-      clearTimeout(timer);
+    // 예전에는 /health 를 fetch 로만 봤다. 그런데 기기에 따라 fetch 만 막히고
+    // WebSocket 은 멀쩡한 경우가 있어, 게임은 되는데 "연결 안 됨" 이 떴다.
+    if (await tryWs()) {
+      setState('ok');
+      setDetail(`${Date.now() - t0}ms 만에 붙었습니다.`);
+      return;
     }
+    setState('fail');
+    setDetail(await tryHealth()
+      ? '서버는 살아 있는데 방 접속이 거부됩니다. 관리자 모드에서 "연결 차단" 이 켜져 있는지 확인하세요.'
+      : '서버에 닿지 못했습니다. 이 기기의 네트워크 문제일 수 있습니다.');
   };
 
   return (
@@ -306,10 +324,15 @@ function ConnCheck() {
       {state === 'fail' && (
         <p className="cc-fail">
           연결 안 됨. {detail}
-          <br />
-          <span className="cc-hint">
-            휴대폰 데이터(와이파이 끄고)로 다시 눌러 보세요. 그때 되면 학교 망 차단입니다.
-          </span>
+          {/* 관리자 차단이 원인일 때는 망 이야기를 꺼내면 엉뚱한 곳을 찾게 된다. */}
+          {!detail.includes('차단') && (
+            <>
+              <br />
+              <span className="cc-hint">
+                휴대폰 데이터(와이파이 끄고)로 다시 눌러 보세요. 그때 되면 학교 망 차단입니다.
+              </span>
+            </>
+          )}
         </p>
       )}
     </div>
@@ -326,19 +349,34 @@ function AdminPanel({ themeId, setThemeId }: { themeId: string; setThemeId: (v: 
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const [locked, setLocked] = useState(false);
+  // null = 아직 확인 못 함. 예전에는 false 로 시작하고 조회 실패를 조용히 삼켜서,
+  // **차단돼 있는데도 "허용됨" 으로 보였다.** 그 상태로 버튼을 누르면 반대로
+  // 차단을 거는 셈이라 영영 못 푼다.
+  const [locked, setLocked] = useState<boolean | null>(null);
+  const [reading, setReading] = useState(false);
 
   const server = (import.meta.env.VITE_SERVER_URL ?? '').trim();
   const httpBase = server.replace(/^ws/, 'http');
 
+  const readLock = useCallback(async () => {
+    if (!httpBase) return;
+    setReading(true);
+    try {
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 8000);
+      const r = await fetch(httpBase + '/admin/lock', { cache: 'no-store', signal: c.signal });
+      clearTimeout(t);
+      setLocked(!!(await r.json()).locked);
+    } catch {
+      setLocked(null);
+      setMsg('현재 차단 상태를 확인하지 못했습니다. 아래 버튼으로 직접 지정하세요.');
+    } finally {
+      setReading(false);
+    }
+  }, [httpBase]);
+
   // 패널을 열면 현재 차단 상태를 읽어온다.
-  useEffect(() => {
-    if (!unlocked || !httpBase) return;
-    fetch(httpBase + '/admin/lock')
-      .then((r) => r.json())
-      .then((j) => setLocked(!!j.locked))
-      .catch(() => undefined);
-  }, [unlocked, httpBase]);
+  useEffect(() => { if (unlocked) void readLock(); }, [unlocked, readLock]);
 
   const resetRooms = async () => {
     if (!httpBase) { setMsg('로컬 모드에서는 서버 방이 없습니다.'); return; }
@@ -358,20 +396,26 @@ function AdminPanel({ themeId, setThemeId }: { themeId: string; setThemeId: (v: 
     }
   };
 
-  const toggleLock = async () => {
+  // 지금 상태를 뒤집는 게 아니라 **원하는 상태를 직접 지정한다.** 화면에 보이는
+  // 상태가 틀렸을 수 있으므로(조회 실패) 뒤집기는 위험하다.
+  const setLock = async (want: boolean) => {
     if (!httpBase) { setMsg('로컬 모드에서는 서버가 없습니다.'); return; }
     setBusy(true); setMsg(null);
     try {
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 12000);
       const r = await fetch(httpBase + '/admin/lock', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ password: pw, locked: !locked }),
+        body: JSON.stringify({ password: pw, locked: want }),
+        signal: c.signal,
       });
+      clearTimeout(t);
       const j = await r.json();
       if (j.ok) { setLocked(j.locked); setMsg(j.locked ? '서버 연결을 차단했습니다.' : '서버 연결을 다시 허용했습니다.'); }
       else setMsg(j.error ?? '실패했습니다.');
     } catch {
-      setMsg('서버에 연결하지 못했습니다.');
+      setMsg('서버에 요청하지 못했습니다. 이 기기에서 서버 주소로 가는 요청이 막혀 있을 수 있습니다 — 휴대폰 데이터 등 다른 망에서 다시 시도해 보세요.');
     } finally {
       setBusy(false);
     }
@@ -433,12 +477,27 @@ function AdminPanel({ themeId, setThemeId }: { themeId: string; setThemeId: (v: 
             브라우저에 저장된 내 정보는 지워지지 않습니다 (위 버튼이 그 역할입니다).
           </p>
 
-          <button className={locked ? 'primary' : 'danger'} disabled={busy} onClick={toggleLock}>
-            {locked ? '서버 연결 허용하기' : '서버 연결 차단하기'}
-          </button>
+          <div className="lock-row">
+            <button className="primary" disabled={busy} onClick={() => setLock(false)}>
+              연결 허용하기
+            </button>
+            <button className="danger" disabled={busy} onClick={() => setLock(true)}>
+              연결 차단하기
+            </button>
+          </div>
           <p className="admin-hint">
-            지금 상태: <b className={locked ? 'lock-on' : 'lock-off'}>{locked ? '차단됨' : '허용됨'}</b>
-            {' '}— 차단하면 새로 들어오려는 사람이 접속하지 못합니다. 수업 시간 외 사용을 막을 때 씁니다.
+            지금 상태:{' '}
+            {locked === null ? (
+              <b className="lock-unknown">확인 못 함</b>
+            ) : (
+              <b className={locked ? 'lock-on' : 'lock-off'}>{locked ? '차단됨' : '허용됨'}</b>
+            )}
+            {' '}<button className="linkish" disabled={reading} onClick={() => void readLock()}>
+              {reading ? '확인 중…' : '다시 확인'}
+            </button>
+            <br />
+            차단하면 새로 들어오려는 사람이 접속하지 못합니다. 수업 시간 외 사용을 막을 때 씁니다.
+            {locked === null && ' 상태를 못 읽었더라도 위 두 버튼은 원하는 상태를 직접 지정하므로 그대로 눌러도 됩니다.'}
           </p>
         </>
       )}

@@ -678,6 +678,9 @@ button.linkish {
 /* 관리자: 차단 상태 표시 */
 .lock-on { color: #ff9b9b; }
 .lock-off { color: #7ee3a6; }
+.lock-unknown { color: #ffc46b; }
+.lock-row { display: flex; gap: 8px; }
+.lock-row button { flex: 1; }
 
 /* ---- 접속 끊긴 사람 안내 ---- */
 .dropped {
