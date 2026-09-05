@@ -84,9 +84,8 @@
 > 차단이 켜져 있으면 모든 접속이 503 으로 막힌다. 상태 표시가 **"확인 못 함"** 이면
 > 조회에 실패한 것이니, **"연결 허용하기"** 를 그냥 눌러 원하는 상태로 직접 지정한다.
 >
-> **이 PC(작업용 노트북)에서는 관리자 기능이 동작하지 않는다.** `workers.dev` 로 가는
-> fetch 가 막혀 있어 차단 on/off·방 초기화 요청이 나가지 않는다(게임은 정상).
-> **휴대폰 데이터 등 다른 망에서** 관리자 모드를 열어 조작한다. 자세한 내용은 log.md.
+> ~~이 PC 에서는 관리자 기능이 동작하지 않는다~~ — **2026-09-05 확인 결과 이 PC 에서도 된다.**
+> 브라우저에서 `/admin/lock` 이 200 으로 응답한다. 예전 판단은 `curl` 결과만 보고 내린 것이다.
 
 ---
 
@@ -116,10 +115,31 @@ curl https://fox-server.gud1396.workers.dev/health      # ok
 curl https://fox-server.gud1396.workers.dev/admin/lock  # {"locked":false}
 ```
 
-> **이 PC 에서는 Worker 에 닿지 않는다.** git-bash `curl` 도, `node -e "fetch(...)"` 도
-> 연결 자체가 타임아웃난다(2026-09-05 확인). 배포는 `api.cloudflare.com` 을 쓰므로
-> 정상이고, **막힌 것은 `workers.dev` 로 가는 길뿐**이다.
-> 확인은 **다른 망(휴대폰 데이터 등)의 브라우저 콘솔**에서 한다.
+> **이 PC 의 git-bash `curl` 로는 Worker 에 닿지 않는다.** schannel 백엔드 문제이며
+> 네트워크 차단이 아니다 (log.md 참고). **`node -e "fetch(...)"` 와 브라우저는 된다**
+> (2026-09-05 재확인: `/health` 200). 둘 중 아무거나 쓰면 된다.
+> 단 `/admin/lock` 은 오리진을 보므로 node 로는 403 이 난다. **브라우저 콘솔로 확인한다.**
+
+### 서버가 무엇을 돌려주는지 보는 법 — `wrangler tail`
+
+학생이 "안 돼요" 라고 할 때 **추측하지 않고 실제 응답 코드를 볼 수 있다.**
+
+```bash
+cd apps/server
+npx wrangler tail fox-server --format json   # 학생에게 다시 시도해 보라고 한다
+```
+
+요청마다 `event.request.headers.origin` 과 `event.response.status` 가 찍힌다.
+읽는 법은 간단하다.
+
+| 보이는 것 | 뜻 | 할 일 |
+|---|---|---|
+| 아무것도 안 찍힘 | 요청이 서버까지 오지도 못했다 | 그 기기의 망 문제 |
+| `403` | 오리진 거부 | `ALLOWED_ORIGINS` 에 그 주소가 없다 |
+| `503` | **관리자 차단이 켜져 있다** | 관리자 모드에서 "연결 허용하기" |
+| `101` | 정상 접속 | 서버 문제 아님 |
+
+`tail` 은 Cloudflare API 로 붙으므로 **내 PC 가 `workers.dev` 에 못 닿아도 동작한다.**
 
 ---
 

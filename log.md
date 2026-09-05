@@ -335,8 +335,29 @@ curl -H "Authorization: Bearer <토큰>" https://api.cloudflare.com/client/v4/us
 
 **검증** — Pages 쪽은 전부 확인했다. 루트 200, `/ANYROUTE` 가 index.html 로 폴백,
 `/assets/*` 에 `max-age=31536000, immutable`, 번들에 `wss://fox-server...` 가 박힘.
-**Worker 오리진 허용은 이 PC 에서 확인하지 못했다** — `workers.dev` 로 가는 연결이
-`curl` 도 `node fetch` 도 타임아웃난다. 다른 망에서 실제 접속으로 확인해야 한다.
+Worker 오리진 허용도 확인했다 — 차단을 푼 뒤 `https://fox-webapp.pages.dev` 오리진으로
+방 WebSocket 이 `101` 로 열렸다.
+
+### 이관 직후 "접속이 안 된다" — 범인은 이관이 아니었다
+
+배포 직후 로비가 "방에 들어가는 중" 에서 멈추고 연결 진단이 "연결 안 됨" 을 냈다.
+이관을 의심했지만 **관리자 "연결 차단" 이 켜진 채로 남아 있었던 것**이다(`503`).
+수업 끝나고 켜 둔 것이 그대로 있었다. Netlify 였어도 똑같이 막혔다.
+
+가른 방법이 이 건의 소득이다. **`npx wrangler tail fox-server --format json`**.
+요청마다 `origin` 과 `response.status` 가 찍힌다. 여기서 한 번에 드러났다.
+
+- `origin: https://fox-webapp.pages.dev` → **오리진 검사는 통과했다.** 이관 설정은 옳다.
+- `response.status: 503` → 차단. 서버 코드가 오리진을 먼저 보고 그다음 잠금을 보므로,
+  `503` 이 찍혔다는 것 자체가 **오리진이 정상이라는 증거**다.
+
+`tail` 은 Cloudflare API 로 붙어서 **내 PC 가 `workers.dev` 에 못 닿아도 동작한다.**
+"안 된다" 는 말 앞에서 추측하지 말고 이걸 먼저 켤 것.
+
+**곁가지로 정정된 것** — "이 PC 에서는 `workers.dev` 에 못 닿는다" 는 절반만 맞다.
+`curl` 은 여전히 실패하지만(schannel), **`node fetch` 와 브라우저는 200 으로 응답받는다.**
+따라서 **관리자 기능도 이 PC 에서 된다.** 진단 중 한 번 타임아웃이 나서 "node 도 안 된다" 고
+적었다가 재확인 후 되돌렸다 — 한 번의 실패로 결론 내리지 말 것.
 
 ---
 
