@@ -12,5 +12,7 @@ tag = "v1"
 new_sqlite_classes = ["GameRoom"]
 
 [vars]
-# 배포 후 Netlify 도메인으로 바꾸세요. 비워두면 모든 오리진을 허용합니다.
-ALLOWED_ORIGINS = "https://marvelous-rabanadas-6be02f.netlify.app"
+# 접속을 허용할 프런트 주소. 쉼표로 여럿 적는다. 비우면 모든 오리진을 허용한다.
+# Pages 가 현재 주소이고, Netlify 는 이관 확인이 끝날 때까지 남겨둔 예전 주소다.
+# 미리보기 배포(<해시>.fox-webapp.pages.dev)는 여기 없으므로 게임이 붙지 않는다 — 의도한 것이다.
+ALLOWED_ORIGINS = "https://fox-webapp.pages.dev,https://marvelous-rabanadas-6be02f.netlify.app"

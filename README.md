@@ -13,8 +13,8 @@
 ## 구조
 
 ```
-packages/engine/   순수 TypeScript 규칙 엔진 (의존성 0, 테스트 32개)
-apps/web/          React + Vite 클라이언트  → Netlify
+packages/engine/   순수 TypeScript 규칙 엔진 (의존성 0, 테스트 36개)
+apps/web/          React + Vite 클라이언트  → Cloudflare Pages
 apps/server/       Cloudflare Worker + Durable Object → Cloudflare
 ```
 
@@ -28,46 +28,31 @@ apps/server/       Cloudflare Worker + Durable Object → Cloudflare
 | **로컬** | `VITE_SERVER_URL` 미설정 | 브라우저 안에서 엔진을 직접 실행. 한 대로 돌려가며 플레이 |
 | **온라인** | `VITE_SERVER_URL` 설정 | 방 코드로 접속, Durable Object 가 상태를 중계 |
 
-Netlify 배포만 해도 **로컬 모드로 즉시 동작**합니다. 온라인은 아래 2단계를 추가하면 됩니다.
+프런트만 배포해도 **로컬 모드로 즉시 동작**합니다. 온라인은 Worker 를 함께 올리면 됩니다.
 
 ## 배포
 
-### 1. GitHub
+프런트(Pages)와 서버(Worker) **둘 다 CLI 로** 올립니다. 푸시로 자동 배포되는 것은 없습니다.
 
 ```bash
-git init
-git add -A
-git commit -m "init"
-git branch -M main
-git remote add origin https://github.com/gud1396-coder/fox-webapp.git
-git push -u origin main
+npm test            # 먼저 통과시킬 것
+npm run deploy:web     # 빌드 + Cloudflare Pages 업로드 → https://fox-webapp.pages.dev
+npm run deploy:server  # 엔진 빌드 + Worker 배포 (engine/server 를 고쳤을 때만)
 ```
 
-### 2. Netlify (프론트엔드)
-
-Netlify 대시보드 → **Add new site → Import an existing project** → GitHub 리포 선택.
-`netlify.toml` 이 있으므로 빌드 설정은 자동으로 잡힙니다.
-
-- Build command: `npm run build:web`
-- Publish directory: `apps/web/dist`
-
-여기까지만 해도 **로컬 모드로 바로 쓸 수 있습니다.**
-
-### 3. Cloudflare (온라인 멀티 — 선택)
+### 처음 한 번만 하는 준비
 
 ```bash
-npm install -g wrangler
-wrangler login
-cd apps/server && wrangler deploy
+npx wrangler login                                          # Cloudflare 로그인
+npx wrangler pages project create fox-webapp --production-branch main
 ```
 
-배포되면 `https://fox-server.<계정>.workers.dev` 주소가 나옵니다.
+서버 주소는 `apps/web/.env.production` 에 들어 있고 빌드 때 번들에 박힙니다
+(공개 Worker 주소라 비밀이 아닙니다). 개발 서버(`npm run dev:web`)에는 적용되지 않아
+그때는 로컬 모드로 돕니다.
 
-1. Netlify 환경변수에 `VITE_SERVER_URL = wss://fox-server.<계정>.workers.dev` 추가 후 재배포
-2. `apps/server/wrangler.toml` 의 `ALLOWED_ORIGINS` 를 Netlify 도메인으로 설정하고 재배포
-
-GitHub Actions 로 자동 배포하려면 리포 Secrets 에 `CLOUDFLARE_API_TOKEN` 을 추가하세요
-(`.github/workflows/deploy-server.yml` 이 `apps/server` 나 `packages/engine` 변경 시 자동 실행).
+Worker 를 처음 올렸다면 `apps/server/wrangler.toml` 의 `ALLOWED_ORIGINS` 에
+프런트 주소를 넣고 `npm run deploy:server` 를 다시 실행하세요. 여기 없는 오리진은 거부됩니다.
 
 > Cloudflare Workers 무료 플랜은 SQLite 백엔드 Durable Object 를 지원하며 SQLite 스토리지 요금이 없습니다.
 > `wrangler.toml` 이 `new_sqlite_classes` 를 쓰는 이유입니다 — `new_classes` 로 바꾸면 무료 플랜에서 배포가 거부됩니다.

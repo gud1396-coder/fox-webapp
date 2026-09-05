@@ -3,7 +3,7 @@
 이 문서만 있으면 **띄우고, 고치고, 배포하고, 수업에 쓸 수 있다.**
 지금까지 무엇을 왜 고쳤는지는 [`log.md`](log.md) 에 있다.
 
-- 최종 갱신: 2026-09-01
+- 최종 갱신: 2026-09-05
 - 규칙 정리: [`docs/RULES.md`](docs/RULES.md) · 프로젝트 개요: [`README.md`](README.md)
 
 ---
@@ -12,21 +12,26 @@
 
 | 항목 | 값 |
 |---|---|
-| 서비스 (학생 접속) | https://marvelous-rabanadas-6be02f.netlify.app |
+| 서비스 (학생 접속) | https://fox-webapp.pages.dev |
+| 예전 주소 (아직 살아 있음) | https://marvelous-rabanadas-6be02f.netlify.app |
 | 저장소 | https://github.com/gud1396-coder/fox-webapp (**공개**) |
 | 로컬 작업 폴더 | `C:\claude\claude\fox-webapp` |
-| 프론트 호스팅 | Netlify — 프로젝트 `marvelous-rabanadas-6be02f` |
+| 프론트 호스팅 | Cloudflare Pages — 프로젝트 `fox-webapp` |
 | 서버 | Cloudflare Worker `fox-server` |
 | 서버 주소 | https://fox-server.gud1396.workers.dev |
 | Cloudflare 계정 | gud1396@hanilgo.cnehs.kr (`1444c3f0a48c411e2a07712d73d0e066`) |
 
-**`main` 에 푸시하면 Netlify 는 자동 재배포된다. Worker 는 자동 배포되지 않는다.**
+**자동 배포는 없다. 푸시해도 아무것도 올라가지 않는다.**
+프런트는 `npm run deploy:web`, 서버는 `npm run deploy:server` 로 직접 올린다.
+
+> 예전 Netlify 주소는 `main` 푸시마다 여전히 자동 재배포된다. 이관이 확인될 때까지
+> 남겨둔 것이라, 두 주소가 다른 버전을 보일 수 있다. **수업에는 Pages 주소를 쓴다.**
 
 ### 설정값이 저장된 위치
 
 | 설정 | 어디에 |
 |---|---|
-| `VITE_SERVER_URL` | Netlify → Project configuration → Environment variables |
+| `VITE_SERVER_URL` | `apps/web/.env.production` (저장소에 있다 — 공개 Worker 주소라 비밀이 아니다) |
 | `ALLOWED_ORIGINS` | `apps/server/wrangler.toml` 의 `[vars]` |
 | `ADMIN_PASSWORD` | Cloudflare Worker 시크릿 — **값은 문서에 적지 않는다** |
 
@@ -39,7 +44,7 @@
 ## 2. 수업에서 쓰는 법
 
 1. 학생들에게 주소를 알려준다. 방 코드까지 담아 링크로 주면 입력이 준다.
-   `https://marvelous-rabanadas-6be02f.netlify.app/#/SCIENCE1`
+   `https://fox-webapp.pages.dev/#/SCIENCE1`
 2. 각자 이름을 넣고 **참가**. 로비에 참가자가 실시간으로 쌓인다.
 3. 다 모이면 아무나 **시작**. 혼자일 때는 시작이 잠겨 있고,
    굳이 혼자 하려면 아래 "혼자 연습하기" 를 눌러야 한다.
@@ -111,9 +116,10 @@ curl https://fox-server.gud1396.workers.dev/health      # ok
 curl https://fox-server.gud1396.workers.dev/admin/lock  # {"locked":false}
 ```
 
-> **이 PC 의 git-bash `curl` 로는 Worker 에 닿지 않는다.** schannel 백엔드 문제이며
-> 네트워크 차단이 아니다 (log.md 참고). 브라우저 콘솔이나
-> `node -e "fetch('...').then(r=>r.text()).then(console.log)"` 로 확인한다.
+> **이 PC 에서는 Worker 에 닿지 않는다.** git-bash `curl` 도, `node -e "fetch(...)"` 도
+> 연결 자체가 타임아웃난다(2026-09-05 확인). 배포는 `api.cloudflare.com` 을 쓰므로
+> 정상이고, **막힌 것은 `workers.dev` 로 가는 길뿐**이다.
+> 확인은 **다른 망(휴대폰 데이터 등)의 브라우저 콘솔**에서 한다.
 
 ---
 
@@ -123,7 +129,7 @@ curl https://fox-server.gud1396.workers.dev/admin/lock  # {"locked":false}
 cd C:\claude\claude\fox-webapp
 npm install            # 처음 한 번
 
-npm test               # 엔진 테스트 32개 (빠르다, 먼저 돌릴 것)
+npm test               # 엔진 테스트 36개 (빠르다, 먼저 돌릴 것)
 npm run dev:web        # 클라이언트 → localhost:5173
 npm run dev:server     # 로컬 서버   → localhost:8787
 ```
@@ -141,14 +147,19 @@ cd apps/web; $env:VITE_SERVER_URL='ws://localhost:8787'; npx vite --port 5173
 ### 배포
 
 ```bash
-npm test && npm run build:web     # 검증
-git push origin main              # → Netlify 자동 재배포
+npm test                          # 먼저 통과시킬 것
+npm run deploy:web                # 빌드 + Pages 업로드 → https://fox-webapp.pages.dev
 npm run deploy:server             # 엔진 빌드 + Worker 배포 (필요할 때만)
+git push origin main              # 기록용. 이것만으로는 아무것도 배포되지 않는다
 ```
 
-> **`packages/engine` 을 고쳤으면 `npm run deploy:server` 가 필수다.**
+> **`packages/engine` 을 고쳤으면 `npm run deploy:server` 도 필수다.**
 > 서버가 같은 엔진을 번들해서 쓰기 때문에, 프론트만 배포하면 규칙이 어긋난다.
-> Worker 자동 배포는 없다 (이유는 log.md).
+
+> **프런트 주소를 바꾸면 `ALLOWED_ORIGINS` 도 같이 고치고 Worker 를 재배포한다.**
+> 목록에 없는 주소에서는 방 접속이 거부된다. `wrangler pages deploy` 가 찍어주는
+> `<해시>.fox-webapp.pages.dev` 미리보기 주소도 목록에 없어 **게임이 붙지 않는다.**
+> 확인은 항상 `https://fox-webapp.pages.dev` 로 한다.
 
 ---
 
@@ -162,9 +173,9 @@ packages/engine/         규칙 엔진 (의존성 0). 서버와 클라이언트�
   src/sheetOps.ts        시트 조작과 보너스 연쇄. canUseDie() 도 여기.
   src/score.ts           점수 계산 (영역별 · 여우 · 합계).
   src/theme.ts           테마(원작 / 지구시스템)의 이름과 용어.
-  src/engine.test.ts     테스트 32개.
+  src/engine.test.ts     테스트 36개.
 
-apps/web/                React + Vite → Netlify
+apps/web/                React + Vite → Cloudflare Pages
   src/App.tsx            로비·게임 화면, 관리자 모드, 설명서, 연결 진단.
   src/Sheet.tsx          점수판 한 장. 보너스 배지·툴팁.
   src/useRoom.ts         WebSocket 연결과 전송 큐. HAS_SERVER 도 여기.

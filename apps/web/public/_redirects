@@ -1,0 +1,2 @@
+# SPA 라우팅: /#/ROOM 직접 접속 대응 (netlify.toml 의 redirects 와 같은 역할)
+/*  /index.html  200

@@ -305,6 +305,41 @@ curl -H "Authorization: Bearer <토큰>" https://api.cloudflare.com/client/v4/us
 
 ---
 
+## 5-1. Netlify → Cloudflare Pages 이관 (2026-09-05)
+
+프런트를 **Cloudflare Pages 프로젝트 `fox-webapp`** 로 옮겼다.
+주소는 https://fox-webapp.pages.dev 이고, 서버(Worker)와 **같은 Cloudflare 계정 하나**로
+관리한다는 것이 옮긴 이유다. Netlify 사이트는 이관이 확인될 때까지 남겨두었다.
+
+**한 것**
+
+- `netlify.toml` 의 SPA 리다이렉트와 자산 캐시 헤더를 Pages 형식인
+  `apps/web/public/_headers` · `_redirects` 로 옮겼다. Vite 가 `public/` 을 그대로
+  `dist/` 로 복사하므로 빌드 산출물에 같이 실린다.
+- `VITE_SERVER_URL` 을 Netlify 대시보드의 환경변수에서 저장소 안의
+  `apps/web/.env.production` 으로 옮겼다. **공개 Worker 주소라 비밀이 아니다.**
+  `.gitignore` 의 `.env.*` 에 걸리므로 `!.env.production` 예외를 넣었다.
+  `.env.production` 은 프로덕션 빌드에만 적용되어, `npm run dev:web` 은 그대로 로컬 모드다.
+  실제 환경변수가 우선하므로 Netlify 빌드도 지금까지처럼 자기 설정값을 쓴다.
+- `npm run deploy:web` 추가 — `build:web` 후 `wrangler pages deploy`.
+  **서버와 배포 방식이 같아졌다**(둘 다 CLI 한 줄, 자동 배포 없음).
+- `ALLOWED_ORIGINS` 에 Pages 주소를 넣고 Worker 재배포. Netlify 주소도 함께 남겼다.
+
+**Git 연동 대신 CLI 업로드를 골랐다.** Git 연동은 대시보드에서 GitHub 앱 권한을
+붙여야 하고, 예전에 `CLOUDFLARE_API_TOKEN` 으로 자동 배포를 붙였다가 걷어낸 전례
+(위 `5fe4c83`)가 있다. 배포 경로가 하나뿐인 편이 "무엇이 올라가 있는가" 를 헷갈리지 않는다.
+
+**주의** — `wrangler pages deploy` 가 마지막에 찍는 `<해시>.fox-webapp.pages.dev` 는
+미리보기 주소다. `ALLOWED_ORIGINS` 에 없으므로 **그 주소로는 게임이 서버에 붙지 않는다.**
+확인은 항상 `https://fox-webapp.pages.dev` 로 한다.
+
+**검증** — Pages 쪽은 전부 확인했다. 루트 200, `/ANYROUTE` 가 index.html 로 폴백,
+`/assets/*` 에 `max-age=31536000, immutable`, 번들에 `wss://fox-server...` 가 박힘.
+**Worker 오리진 허용은 이 PC 에서 확인하지 못했다** — `workers.dev` 로 가는 연결이
+`curl` 도 `node fetch` 도 타임아웃난다. 다른 망에서 실제 접속으로 확인해야 한다.
+
+---
+
 ## 6. 배포 이력
 
 | 대상 | 방법 |
@@ -313,6 +348,7 @@ curl -H "Authorization: Bearer <토큰>" https://api.cloudflare.com/client/v4/us
 | Netlify | `main` 푸시마다 자동. `VITE_SERVER_URL` 등록 후 캐시 없이 재배포 |
 | Netlify 공개 전환 | Private → **Public** (기본이 Private 이라 학생이 못 들어왔다) |
 | Cloudflare Worker | CLI 로 여러 차례. 이후 `npm run deploy:server` 사용 |
+| Cloudflare Pages | 2026-09-05 이관. `npm run deploy:web` (CLI 업로드, 자동 배포 없음) |
 
 Netlify UI 가 `Sites` → **`Projects`** 로 바뀌어 있어 설정 경로를 찾기 어려웠다.
 환경변수는 **Project configuration → Environment variables**,
