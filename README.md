@@ -66,10 +66,9 @@ npm run dev:web       # 클라이언트 (로컬 모드)
 npm run dev:server    # wrangler dev
 ```
 
-## 아직 확인이 필요한 시트 데이터
+## 시트 데이터
 
-공식 룰북 PDF 의 벡터 텍스트에서 뽑아낸 값은 확정이지만,
-**아이콘으로 그려진 부분은 추출되지 않아 임시값**이 들어 있습니다.
-`packages/engine/src/sheet.ts` 에서 `TODO(` 로 표시된 곳이며, 실물 점수판 사진 1장이면 전부 확정됩니다.
+`packages/engine/src/sheet.ts` 의 숫자·보너스 배치는 **전부 확정된 값**입니다.
+공식 룰북 PDF 의 벡터 텍스트와 실물 점수판 이미지로 대조했고, 임시값은 남아 있지 않습니다.
 
-확정된 값 / 남은 항목은 `docs/RULES.md` 를 참고하세요.
+무엇을 무엇으로 확인했는지는 [`docs/RULES.md`](docs/RULES.md) 의 "확인 완료 항목" 에 있습니다.
